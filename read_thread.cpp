@@ -3,7 +3,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "keyboard_util.h"
-#include "global_vars.h"
 #include <chrono>
 #include <fstream>
 #include <queue>
@@ -11,73 +10,40 @@
 #include <sstream>
 #include <mutex>
 #include <condition_variable>
+#include "read_thread.h"
 
-const int BUFFERED_LOG_COUNT = 100;  // 한 번에 기록할 로그의 최대 개수
-int hidg_fd;
+void ReadThread::cb_transfer(struct libusb_transfer* transfer) {
+    ReadThread* self = static_cast<ReadThread*>(transfer->user_data);
 
-void loggerThreadFunc() {
-    std::ofstream file("keyboard_logs.txt");
-
-    while (true) {
-
-        std::unique_lock<std::mutex> lock(logMutex);
-
-        logCondition.wait(lock, [] { 
-            return isRecording && !logQueue.empty(); 
-        });
-
-        if (logQueue.empty()) {
-            continue;
-        }
-
-        auto logItem = logQueue.front();
-        logQueue.pop();
-        lock.unlock();
-
-        file << "Time diff: " << logItem.first.count() << "ns, Data: ";
-        for (const auto& byte : logItem.second) {
-            file << std::hex << std::uppercase << static_cast<int>(byte) << " ";
-        }
-        file << std::endl;
-
-        // Check for errors
-        if (!file) {
-            std::cerr << "Error writing to keyboard_logs.txt!" << std::endl;
-            // Optionally, you can add more error handling here.
-        }
-    }
-
-    file.close();
-}
-
-void cb_transfer(struct libusb_transfer* transfer) {
     if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
         fprintf(stderr, "Transfer not completed: %d\n", transfer->status);
         return;
     }
     auto currentTimestamp = std::chrono::high_resolution_clock::now();
 
-    if (isStartingToRecord) {
-        lastTimestamp = currentTimestamp;
-        isStartingToRecord = false;
+    if (self->isStartingToRecord) {
+        self->lastTimestamp = currentTimestamp;
+        self->isStartingToRecord = false;
     }
 
-    if (isRecording) {
-        auto elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTimestamp - lastTimestamp);
+    if (self->isRecording) {
+        auto elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTimestamp - self->lastTimestamp);
 
         std::vector<unsigned char> dataVector(transfer->buffer, transfer->buffer + transfer->actual_length);
 
-        std::unique_lock<std::mutex> lock(logMutex);
-        logQueue.emplace(elapsedNanoseconds, dataVector);
-        logCondition.notify_one();
+        std::unique_lock<std::mutex> lock(self->logMutex);
+        self->logQueue.emplace(elapsedNanoseconds, dataVector);
+        self->logCondition.notify_one();
     }
-    lastTimestamp = currentTimestamp;
+    self->lastTimestamp = currentTimestamp;
 
     // HID report 보내기
-    if (hidg_fd < 0) {
-        perror("Failed to open " HIDG_READ_PATH);
+    self->hidg_fd = open("/dev/hidg0", O_RDWR); // HIDG_READ_PATH가 정의되지 않았으므로 임시 경로를 사용
+    if (self->hidg_fd < 0) {
+        perror("Failed to open /dev/hidg0"); // 경로 수정
     } else {
-        write(hidg_fd, transfer->buffer, transfer->actual_length);
+        write(self->hidg_fd, transfer->buffer, transfer->actual_length);
+        close(self->hidg_fd); // 파일 디스크립터를 닫아야 함
     }
 
     // 다시 전송을 예약 (계속해서 데이터를 받기 위함)
@@ -85,7 +51,7 @@ void cb_transfer(struct libusb_transfer* transfer) {
 }
 
 
-void readThreadFunc(libusb_context* ctx) {
+void ReadThread::readThreadFunc(libusb_context* ctx) {
     libusb_device **devs;
     libusb_device_handle *handle = NULL;
     ssize_t cnt;
@@ -97,7 +63,7 @@ void readThreadFunc(libusb_context* ctx) {
         return;
     }
 
-    if (find_keyboard(devs, &handle, &endpoint_address) != 0) {
+    if (KeyboardUtil::find_keyboard(devs, &handle, &endpoint_address) != 0) {
         std::cerr << "No keyboard found." << std::endl;
         libusb_free_device_list(devs, 1);
         return;
@@ -112,7 +78,7 @@ void readThreadFunc(libusb_context* ctx) {
     }
 
     hidg_fd = open(HIDG_READ_PATH, O_RDWR);
-    libusb_fill_interrupt_transfer(transfer, handle, endpoint_address, data, sizeof(data), cb_transfer, NULL, 0);
+    libusb_fill_interrupt_transfer(transfer, handle, endpoint_address, data, sizeof(data), &ReadThread::cb_transfer, this, 0);
     int r = libusb_submit_transfer(transfer);
     if (r != 0) {
         std::cerr << "Error submitting transfer: " << libusb_error_name(r) << std::endl;
@@ -130,4 +96,20 @@ void readThreadFunc(libusb_context* ctx) {
     close(hidg_fd);
     libusb_close(handle);
     libusb_free_device_list(devs, 1);
+}
+
+void ReadThread::setLastTimestamp(const std::chrono::high_resolution_clock::time_point& timestamp) {
+    lastTimestamp = timestamp;
+}
+
+std::queue<std::pair<std::chrono::nanoseconds, std::vector<unsigned char>>>& ReadThread::getLogQueue() {
+    return logQueue;
+}
+
+std::condition_variable& ReadThread::getLogCondition() {
+    return logCondition;
+}
+
+std::mutex& ReadThread::getLogMutex() {
+    return logMutex;
 }

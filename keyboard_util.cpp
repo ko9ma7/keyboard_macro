@@ -1,7 +1,7 @@
 #include "keyboard_util.h"
 #include <iostream>
 
-int find_keyboard(libusb_device **devs, libusb_device_handle **handle, uint8_t *endpoint_address) {
+int KeyboardUtil::find_keyboard(libusb_device **devs, libusb_device_handle **handle, uint8_t *endpoint_address) {
     libusb_device *dev;
     int i = 0, r;
 

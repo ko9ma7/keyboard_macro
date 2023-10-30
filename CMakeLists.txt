@@ -23,10 +23,11 @@ include_directories(${CMAKE_SOURCE_DIR}/include ${LIBUSB_INCLUDE_DIR})
 # 소스 파일 추가
 set(SOURCE_FILES
     main.cpp
-    global_vars.cpp
+    read_thread.cpp
+    logger_thread.cpp
     keyboard_util.cpp
-    readThread.cpp
-    writeThread.cpp
+    # global_vars.cpp 이 파일은 이제 필요하지 않으므로 제거합니다.
+    # writeThread.cpp 파일 이름이 변경되지 않았다면 이 파일도 포함시킵니다.
 )
 
 add_executable(KeyboardDriver ${SOURCE_FILES})

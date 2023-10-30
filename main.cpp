@@ -5,13 +5,15 @@
 #include <thread>
 #include <condition_variable>
 #include "keyboard_util.h"
-#include "global_vars.h"
+#include "read_thread.h"
+#include "logger_thread.h"
 
-extern void readThreadFunc(libusb_context* ctx);
 extern void writeThreadFunc(libusb_context* ctx);
-extern void loggerThreadFunc();
 
 int main() {
+    ReadThread readThread;
+    LoggerThread loggerThread;
+
     libusb_context *ctx;
     int r;
 
@@ -22,20 +24,23 @@ int main() {
     }
 
     auto currentTimestamp = std::chrono::high_resolution_clock::now();
-    lastTimestamp = currentTimestamp;
+    readThread.setLastTimestamp(currentTimestamp);
 
-    std::thread readThread(readThreadFunc, ctx);
-    std::thread writeThread(writeThreadFunc, ctx);
+    loggerThread.setLogQueue(readThread.getLogQueue());
+    loggerThread.setLogCondition(readThread.getLogCondition());
+    loggerThread.setLogMutex(readThread.getLogMutex());
+    loggerThread.setIsRecording(&readThread.isRecording);
 
-    std::thread loggerThread(loggerThreadFunc);
+    std::thread readThreadInstance(&ReadThread::readThreadFunc, &readThread, ctx);
+    std::thread loggerThreadInstance(&LoggerThread::loggerThreadFunc, &loggerThread);
+
     // 나머지 코드...
 
     // 프로그램 종료 직전에 이 코드 추가:
-    logCondition.notify_one();
-    loggerThread.join();
+    readThread.getLogCondition().notify_one();
+    loggerThreadInstance.join();
 
-    readThread.join();
-    writeThread.join();
+    readThreadInstance.join();
 
     libusb_exit(ctx);
     return 0;
