@@ -3,40 +3,82 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "keyboard_util.h"
+#include "global_vars.h"
+#include <chrono>
+#include <fstream>
+#include <queue>
+#include <thread>
+#include <sstream>
+#include <mutex>
+#include <condition_variable>
 
-#define HIDG_PATH "/dev/hidg0"
+const int BUFFERED_LOG_COUNT = 100;  // 한 번에 기록할 로그의 최대 개수
+int hidg_fd;
 
-void send_to_pc(libusb_device_handle *pc_handle, unsigned char *data, int length) {
-    int transferred;
-    // 0x01은 PC와의 통신을 위한 endpoint 주소라고 가정
-    int r = libusb_interrupt_transfer(pc_handle, 0x01, data, length, &transferred, 0);
-    if (r != 0) {
-        std::cerr << "Error sending data to PC: " << libusb_error_name(r) << std::endl;
+void loggerThreadFunc() {
+    std::ofstream file("keyboard_logs.txt");
+
+    while (true) {
+
+        std::unique_lock<std::mutex> lock(logMutex);
+
+        logCondition.wait(lock, [] { 
+            return isRecording && !logQueue.empty(); 
+        });
+
+        if (logQueue.empty()) {
+            continue;
+        }
+
+        auto logItem = logQueue.front();
+        logQueue.pop();
+        lock.unlock();
+
+        file << "Time diff: " << logItem.first.count() << "ns, Data: ";
+        for (const auto& byte : logItem.second) {
+            file << std::hex << std::uppercase << static_cast<int>(byte) << " ";
+        }
+        file << std::endl;
+
+        // Check for errors
+        if (!file) {
+            std::cerr << "Error writing to keyboard_logs.txt!" << std::endl;
+            // Optionally, you can add more error handling here.
+        }
     }
-}
 
+    file.close();
+}
 
 void cb_transfer(struct libusb_transfer* transfer) {
     if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
         fprintf(stderr, "Transfer not completed: %d\n", transfer->status);
         return;
     }
+    auto currentTimestamp = std::chrono::high_resolution_clock::now();
 
-    unsigned char *data = transfer->buffer;
-    for (int i = 0; i < transfer->actual_length; i++) {
-        std::cout << "0x" << std::hex << std::uppercase << (int)data[i] << " ";
+    if (isStartingToRecord) {
+        lastTimestamp = currentTimestamp;
+        isStartingToRecord = false;
     }
-    std::cout << std::endl;
+
+    if (isRecording) {
+        auto elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTimestamp - lastTimestamp);
+
+        std::vector<unsigned char> dataVector(transfer->buffer, transfer->buffer + transfer->actual_length);
+
+        std::unique_lock<std::mutex> lock(logMutex);
+        logQueue.emplace(elapsedNanoseconds, dataVector);
+        logCondition.notify_one();
+    }
+    lastTimestamp = currentTimestamp;
 
     // HID report 보내기
-    send_to_pc(pc_handle, data, transfer->actual_length);
-    // int hidg_fd = open(HIDG_PATH, O_RDWR);
-    // if (hidg_fd < 0) {
-    //     perror("Failed to open " HIDG_PATH);
-    // } else {
-    //     write(hidg_fd, transfer->buffer, transfer->actual_length);
-    //     close(hidg_fd);
-    // }
+    if (hidg_fd < 0) {
+        perror("Failed to open " HIDG_READ_PATH);
+    } else {
+        write(hidg_fd, transfer->buffer, transfer->actual_length);
+    }
 
     // 다시 전송을 예약 (계속해서 데이터를 받기 위함)
     libusb_submit_transfer(transfer);
@@ -69,6 +111,7 @@ void readThreadFunc(libusb_context* ctx) {
         return;
     }
 
+    hidg_fd = open(HIDG_READ_PATH, O_RDWR);
     libusb_fill_interrupt_transfer(transfer, handle, endpoint_address, data, sizeof(data), cb_transfer, NULL, 0);
     int r = libusb_submit_transfer(transfer);
     if (r != 0) {
@@ -84,6 +127,7 @@ void readThreadFunc(libusb_context* ctx) {
         }
     }
 
+    close(hidg_fd);
     libusb_close(handle);
     libusb_free_device_list(devs, 1);
 }

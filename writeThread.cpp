@@ -1,61 +1,84 @@
 #include <iostream>
 #include <libusb-1.0/libusb.h>
 #include <fcntl.h>
+#include <cstring>
 #include <unistd.h>
+#include <functional>
+#include <map>
 #include "keyboard_util.h"
+#include <mutex>
+#include <condition_variable>
+#include "global_vars.h"
 
-void cb_write_transfer(struct libusb_transfer* transfer) {
-    if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
-        fprintf(stderr, "Write transfer not completed: %d\n", transfer->status);
-        return;
-    }
+#define HIDG_WRITE_PATH "/dev/hidg1"
 
-    // Handle the received data as needed
-    // ...
+enum Action {
+    START_RECORDING,
+    STOP_RECORDING,
+    // 여기에 필요한 다른 작업을 추가할 수 있습니다.
+};
 
-    // Optionally, you can re-submit the transfer if you want to receive more data
-    libusb_submit_transfer(transfer);
+// 녹화 시작 함수
+void startRecording() {
+    std::lock_guard<std::mutex> lock(recordingMutex);
+    isRecording = true;
+    isStartingToRecord = true;
+    recordingCondition.notify_all();
+    std::cout << "녹화 시작" << std::endl;
 }
 
+// 녹화 종료 함수
+void stopRecording() {
+    std::lock_guard<std::mutex> lock(recordingMutex);
+    isRecording = false;
+    recordingCondition.notify_all();
+    std::cout << "녹화 종료1" << std::endl;
+}
+
+
 void writeThreadFunc(libusb_context* ctx) {
-    libusb_device **devs;
-    libusb_device_handle *handle = NULL;
-    uint8_t endpoint_address;
-
-    ssize_t cnt = libusb_get_device_list(ctx, &devs);
-    if (cnt < 0) {
-        std::cerr << "Failed to get device list." << std::endl;
+    int hidg_fd_read = open(HIDG_WRITE_PATH, O_RDONLY);
+    if (hidg_fd_read < 0) {
+        std::cerr << "Failed to open " << HIDG_WRITE_PATH << std::endl;
         return;
     }
 
-    if (find_keyboard(devs, &handle, &endpoint_address) != 0) {
-        // Handle the error
-        return;
-    }
+    std::map<std::string, std::function<void()>> actionMap = {
+        {"0010000000000000", startRecording},
+        {"0020000000000000", stopRecording}
+    };
 
     unsigned char data[8];
-    libusb_transfer* transfer = libusb_alloc_transfer(0);
-    if (!transfer) {
-        // Handle the error
-        return;
-    }
-
-    libusb_fill_interrupt_transfer(transfer, handle, endpoint_address, data, sizeof(data), cb_write_transfer, NULL, 5000);
-    int r = libusb_submit_transfer(transfer);
-    if (r != 0) {
-        // Handle the error
-        return;
-    }
 
     while (true) {
-        r = libusb_handle_events(ctx);
-        if (r != 0) {
-            // Handle the error
+        memset(data, 0, sizeof(data));
+        // HID 장치에서 데이터 읽기
+        ssize_t bytesRead = read(hidg_fd_read, data, sizeof(data));
+        if (bytesRead < 0) {
+            std::cerr << "Error reading from " << HIDG_WRITE_PATH << std::endl;
             break;
+        }
+
+        std::string dataStr;
+        for (ssize_t i = 0; i < bytesRead; ++i) {
+            char buffer[3];
+            snprintf(buffer, sizeof(buffer), "%02X", data[i]);
+            dataStr += buffer;
+        }
+
+
+        // 여기서는 예시로 데이터를 화면에 출력합니다.
+        std::cout <<"size: "<<bytesRead<< " Received data: ";
+        for (ssize_t i = 0; i < bytesRead; ++i) {
+            std::cout << std::hex << std::uppercase << (int)data[i] << " ";
+        }
+        std::cout << std::endl;
+        std::cout<<dataStr<<'\n';
+
+        if (actionMap.find(dataStr) != actionMap.end()) {
+            actionMap[dataStr](); // 매핑된 함수 바로 실행
         }
     }
 
-    // Cleanup
-    libusb_close(handle);
-    libusb_free_device_list(devs, 1);
+    close(hidg_fd_read);
 }
