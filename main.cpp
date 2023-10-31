@@ -4,11 +4,21 @@
 #include <unistd.h>
 #include <thread>
 #include <condition_variable>
-#include "keyboard_util.h"
-#include "read_thread.h"
-#include "logger_thread.h"
+#include "utils/keyboard_util.h"
+#include "read_thread/read_thread.h"
+#include "logger_thread/logger_thread.h"
+#include "grpc_thread/grpc_thread.h"
 
-extern void writeThreadFunc(libusb_context* ctx);
+void RunServer() {
+    std::string server_address("0.0.0.0:50051");
+    InputServiceImpl service; 
+    grpc::ServerBuilder builder;
+    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+    builder.RegisterService(&service);
+    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
+    std::cout << "Server listening on " << server_address << std::endl;
+    server->Wait();
+}
 
 int main() {
     ReadThread readThread;
@@ -33,6 +43,7 @@ int main() {
 
     std::thread readThreadInstance(&ReadThread::readThreadFunc, &readThread, ctx);
     std::thread loggerThreadInstance(&LoggerThread::loggerThreadFunc, &loggerThread);
+    std::cout<<"sibal\n";
 
     // 나머지 코드...
 

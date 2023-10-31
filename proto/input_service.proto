@@ -1,0 +1,19 @@
+// input.proto
+syntax = "proto3";
+
+service Input{
+  rpc StartRecording(StartRequest) returns (StatusResponse);
+  rpc StopRecording(StopRequest) returns (StatusResponse);
+}
+
+message StartRequest {
+  // 필요한 필드를 여기에 추가
+}
+
+message StopRequest {
+  // 필요한 필드를 여기에 추가
+}
+
+message StatusResponse {
+  string message = 1;
+}

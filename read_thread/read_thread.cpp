@@ -2,7 +2,7 @@
 #include <libusb-1.0/libusb.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "keyboard_util.h"
+#include "../utils/keyboard_util.h"
 #include <chrono>
 #include <fstream>
 #include <queue>
