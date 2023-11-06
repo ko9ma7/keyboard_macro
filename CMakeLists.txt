@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(KeyboardDriver)
+project(KeyboardDriver C CXX)
+
+include(grpc.cmake)
 
 # C++ 표준 설정
 set(CMAKE_CXX_STANDARD 17)
@@ -17,23 +19,13 @@ find_library(LIBUSB_LIBRARY
   PATHS /usr/lib /usr/local/lib
 )
 
-list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/.local")
 find_program(GRPC_CPP_PLUGIN grpc_cpp_plugin)
+find_program(PROTOC_EXECUTABLE protoc PATHS "$ENV{HOME}/.local/bin")
 
 # 기존 find_package(gRPC ...) 호출 전에 추가
 find_library(PROTOBUF_LIB NAMES protobuf libprotobuf PATHS ${CMAKE_PREFIX_PATH}/lib)
 find_library(PROTOC_LIB NAMES protoc libprotoc PATHS ${CMAKE_PREFIX_PATH}/lib)
 find_path(PROTOBUF_INCLUDE_DIR google/protobuf/message.h PATHS ${CMAKE_PREFIX_PATH}/include)
-
-add_library(protobuf::libprotobuf STATIC IMPORTED)
-set_target_properties(protobuf::libprotobuf PROPERTIES
-  IMPORTED_LOCATION "${PROTOBUF_LIB}"
-  INTERFACE_INCLUDE_DIRECTORIES "${PROTOBUF_INCLUDE_DIR}")
-
-add_library(protobuf::libprotoc STATIC IMPORTED)
-set_target_properties(protobuf::libprotoc PROPERTIES
-  IMPORTED_LOCATION "${PROTOC_LIB}"
-  INTERFACE_INCLUDE_DIRECTORIES "${PROTOBUF_INCLUDE_DIR}")
 
 # gRPC 라이브러리 찾기
 find_package(gRPC CONFIG REQUIRED)
@@ -48,8 +40,6 @@ set(SOURCE_FILES
     logger_thread/logger_thread.cpp
     utils/keyboard_util.cpp
     grpc_thread/grpc_thread.cpp
-    # global_vars.cpp 이 파일은 이제 필요하지 않으므로 제거합니다.
-    # writeThread.cpp 파일 이름이 변경되지 않았다면 이 파일도 포함시킵니다.
 )
 
 # Protocol Buffers 파일에 대한 코드를 생성하도록 명령어 추가
@@ -71,7 +61,7 @@ foreach(PROTO_FILE ${PROTO_FILES})
            "${GENERATED_PROTOBUF_PATH}/${PROTO_NAME}.pb.h"
            "${GENERATED_PROTOBUF_PATH}/${PROTO_NAME}.grpc.pb.cc"
            "${GENERATED_PROTOBUF_PATH}/${PROTO_NAME}.grpc.pb.h"
-    COMMAND protoc
+    COMMAND ${PROTOC_EXECUTABLE}
     ARGS --grpc_out "${GENERATED_PROTOBUF_PATH}"
          --cpp_out "${GENERATED_PROTOBUF_PATH}"
          -I "${PROTO_PATH}"
@@ -95,6 +85,7 @@ target_link_libraries(KeyboardDriver PRIVATE
     pthread
     gRPC::grpc++
     gRPC::grpc
+    # grpc++_reflection
     protobuf::libprotobuf
 )
 
