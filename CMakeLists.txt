@@ -19,28 +19,22 @@ find_library(LIBUSB_LIBRARY
   PATHS /usr/lib /usr/local/lib
 )
 
-find_program(GRPC_CPP_PLUGIN grpc_cpp_plugin)
-find_program(PROTOC_EXECUTABLE protoc PATHS "$ENV{HOME}/.local/bin")
-
-# 기존 find_package(gRPC ...) 호출 전에 추가
-find_library(PROTOBUF_LIB NAMES protobuf libprotobuf PATHS ${CMAKE_PREFIX_PATH}/lib)
-find_library(PROTOC_LIB NAMES protoc libprotoc PATHS ${CMAKE_PREFIX_PATH}/lib)
-find_path(PROTOBUF_INCLUDE_DIR google/protobuf/message.h PATHS ${CMAKE_PREFIX_PATH}/include)
-
-# gRPC 라이브러리 찾기
-find_package(gRPC CONFIG REQUIRED)
-
 # 헤더 파일 경로 추가
 include_directories(${CMAKE_SOURCE_DIR}/include ${LIBUSB_INCLUDE_DIR})
 
 # 소스 파일 추가
 set(SOURCE_FILES
     main.cpp
-    read_thread/read_thread.cpp
-    logger_thread/logger_thread.cpp
-    utils/keyboard_util.cpp
-    grpc_thread/grpc_thread.cpp
 )
+
+# 각 폴더에 있는 .cpp 파일을 자동으로 찾아서 SOURCE_FILES에 추가
+file(GLOB READ_THREAD_SOURCES "${CMAKE_SOURCE_DIR}/read_thread/*.cpp")
+file(GLOB LOGGER_THREAD_SOURCES "${CMAKE_SOURCE_DIR}/logger_thread/*.cpp")
+file(GLOB UTILS_SOURCES "${CMAKE_SOURCE_DIR}/utils/*.cpp")
+file(GLOB GRPC_THREAD_SOURCES "${CMAKE_SOURCE_DIR}/grpc_thread/*.cpp")
+
+# 찾아진 소스 파일을 SOURCE_FILES에 추가
+list(APPEND SOURCE_FILES ${READ_THREAD_SOURCES} ${LOGGER_THREAD_SOURCES} ${UTILS_SOURCES} ${GRPC_THREAD_SOURCES})
 
 # Protocol Buffers 파일에 대한 코드를 생성하도록 명령어 추가
 set(PROTO_PATH "${CMAKE_SOURCE_DIR}/proto")
@@ -61,11 +55,11 @@ foreach(PROTO_FILE ${PROTO_FILES})
            "${GENERATED_PROTOBUF_PATH}/${PROTO_NAME}.pb.h"
            "${GENERATED_PROTOBUF_PATH}/${PROTO_NAME}.grpc.pb.cc"
            "${GENERATED_PROTOBUF_PATH}/${PROTO_NAME}.grpc.pb.h"
-    COMMAND ${PROTOC_EXECUTABLE}
+    COMMAND ${_PROTOBUF_PROTOC}
     ARGS --grpc_out "${GENERATED_PROTOBUF_PATH}"
          --cpp_out "${GENERATED_PROTOBUF_PATH}"
          -I "${PROTO_PATH}"
-         --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN}"
+         --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
          "${PROTO_FILE}"
     DEPENDS "${PROTO_FILE}"
   )
@@ -83,10 +77,9 @@ add_executable(KeyboardDriver ${SOURCE_FILES})
 target_link_libraries(KeyboardDriver PRIVATE 
     ${LIBUSB_LIBRARY} 
     pthread
-    gRPC::grpc++
-    gRPC::grpc
-    # grpc++_reflection
-    protobuf::libprotobuf
+    ${_REFLECTION}
+    ${_GRPC_GRPCPP}
+    ${_PROTOBUF_LIBPROTOBUF}
 )
 
 # 컴파일 옵션 추가 (예: 최적화, 경고 메시지 등)
