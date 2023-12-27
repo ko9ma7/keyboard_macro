@@ -11,7 +11,7 @@ message StartRequest {
 }
 
 message StopRequest {
-  // 필요한 필드를 여기에 추가
+  string filename = 1; // 저장할 파일 이름 필드 추가
 }
 
 message StatusResponse {

@@ -4,9 +4,13 @@
 
 #include <grpcpp/grpcpp.h>
 #include "grpc/input_service.grpc.pb.h"
+#include "../logger_thread/logger_thread.h"
 
 class InputServiceImpl final : public Input::Service {
+
 public:
+    LoggerThread* loggerThread;
+
     grpc::Status StartRecording(grpc::ServerContext* context, const StartRequest* request,
                                 StatusResponse* response) override;
     grpc::Status StopRecording(grpc::ServerContext* context, const StopRequest* request,

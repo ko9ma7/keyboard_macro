@@ -32,9 +32,10 @@ file(GLOB READ_THREAD_SOURCES "${CMAKE_SOURCE_DIR}/read_thread/*.cpp")
 file(GLOB LOGGER_THREAD_SOURCES "${CMAKE_SOURCE_DIR}/logger_thread/*.cpp")
 file(GLOB UTILS_SOURCES "${CMAKE_SOURCE_DIR}/utils/*.cpp")
 file(GLOB GRPC_THREAD_SOURCES "${CMAKE_SOURCE_DIR}/grpc_thread/*.cpp")
+file(GLOB MAIN_THREAD_SOURCES "${CMAKE_SOURCE_DIR}/controller/*.cpp")
 
 # 찾아진 소스 파일을 SOURCE_FILES에 추가
-list(APPEND SOURCE_FILES ${READ_THREAD_SOURCES} ${LOGGER_THREAD_SOURCES} ${UTILS_SOURCES} ${GRPC_THREAD_SOURCES})
+list(APPEND SOURCE_FILES ${READ_THREAD_SOURCES} ${LOGGER_THREAD_SOURCES} ${UTILS_SOURCES} ${GRPC_THREAD_SOURCES} ${MAIN_THREAD_SOURCES})
 
 # Protocol Buffers 파일에 대한 코드를 생성하도록 명령어 추가
 set(PROTO_PATH "${CMAKE_SOURCE_DIR}/proto")
@@ -84,3 +85,5 @@ target_link_libraries(KeyboardDriver PRIVATE
 
 # 컴파일 옵션 추가 (예: 최적화, 경고 메시지 등)
 target_compile_options(KeyboardDriver PRIVATE -Wall -O2)
+
+install(TARGETS KeyboardDriver DESTINATION ${CMAKE_SOURCE_DIR}/rspi)
