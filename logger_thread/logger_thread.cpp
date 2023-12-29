@@ -2,10 +2,9 @@
 #include "logger_thread.h"
 #include <fstream>
 #include <iostream>
+#include "../utils/type.h"
 
 void LoggerThread::loggerThreadFunc() {
-    file.open("keyboard_logs.txt"); // 파일 열기
-
     while (true) {
 
         std::unique_lock<std::mutex> lock(readThread->getLogMutex());
@@ -36,22 +35,37 @@ void LoggerThread::loggerThreadFunc() {
             }
         }
     }
-
-    file.close();
 }
 
-bool LoggerThread::renameLogFile(const std::string& newFilename) {
+void LoggerThread::startLogging(const std::string& filename) {
     std::lock_guard<std::mutex> lock(fileMutex);
-    file.close(); // 현재 로그 파일 닫기
-
-    try {
-        std::filesystem::rename("keyboard_logs.txt", newFilename);
-    } catch (const std::filesystem::filesystem_error& e) {
-        std::cerr << "File rename error: " << e.what() << std::endl;
-        file.open("keyboard_logs.txt", std::ios::app); // 다시 기존 파일 열기
-        return false;
-    }
-
-    file.open("keyboard_logs.txt", std::ios::app); // 새 로그 파일 열기
-    return true;
+    std::string fullPath = "save/" + filename + ".sav";
+    file.open(fullPath, std::ios::out | std::ios::app); // 파일 열기
 }
+
+void LoggerThread::stopLogging() {
+    std::lock_guard<std::mutex> lock(fileMutex);
+    if (file.is_open()) {
+        file.close(); // 로그 파일 닫기
+    }
+}
+
+void LoggerThread::saveMacroToFile(const std::vector<KeyMacro::KeyEvent>& events, const std::string& filename) {
+        std::lock_guard<std::mutex> lock(fileMutex);
+        std::ofstream macroFile("save/" + filename + ".sav", std::ios::out | std::ios::trunc);
+
+        if (!macroFile.is_open()) {
+            std::cerr << "Error opening file: save/" << filename << ".sav" << std::endl;
+            return;
+        }
+
+        for (const auto& event : events) {
+            macroFile << "Time diff: " << event.delay << "ns, Data: ";
+            for (const auto& byte : event.data) {
+                macroFile << std::hex << std::uppercase << static_cast<int>(byte) << " ";
+            }
+            macroFile << std::endl;
+        }
+
+        macroFile.close();
+    }

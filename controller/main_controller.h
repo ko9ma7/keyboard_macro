@@ -25,6 +25,7 @@ private:
     void injectDependencies() {
         INJECT_DEPENDENCY(loggerThread, grpcThread);
         INJECT_DEPENDENCY(readThread, loggerThread);
+        INJECT_DEPENDENCY(readThread, grpcThread);
     }
 };
 

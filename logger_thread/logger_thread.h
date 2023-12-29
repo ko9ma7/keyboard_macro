@@ -10,6 +10,7 @@
 #include "../read_thread/read_thread.h"
 #include <fstream>
 #include <filesystem>
+#include "../utils/type.h"
 
 class LoggerThread {
 public:
@@ -27,7 +28,11 @@ public:
         readThread->getLogCondition().notify_one();
     }
 
-    bool renameLogFile(const std::string& newFilename);
+    void startLogging(const std::string& filename);
+
+    void stopLogging();
+
+    void saveMacroToFile(const std::vector<KeyMacro::KeyEvent>& events, const std::string& filename);
 
 private:
     std::ofstream file;

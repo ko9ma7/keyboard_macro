@@ -6,7 +6,7 @@
 #include <libusb-1.0/libusb.h>
 
 #define HIDG_READ_PATH "/dev/hidg0"
-#define HIDG_WRITE_PATH "/dev/hidg1"
+#define HIDG_MACRO_PATH "/dev/hidg1"
 
 
 class KeyboardUtil {

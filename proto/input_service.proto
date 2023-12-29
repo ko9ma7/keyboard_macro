@@ -1,19 +1,52 @@
 // input.proto
 syntax = "proto3";
 
-service Input{
+service Input {
   rpc StartRecording(StartRequest) returns (StatusResponse);
   rpc StopRecording(StopRequest) returns (StatusResponse);
+  rpc StartReplay(ReplayRequest) returns (StatusResponse);
+  rpc ReplayMacroDebug(ReplayRequest) returns (stream MacroEvent);
+  rpc StopReplay(StopReplayRequest) returns (StatusResponse);
+  rpc ListSaveFiles(ListRequest) returns (SaveFilesResponse);
+  rpc SaveMacro(SaveMacroRequest) returns (SaveMacroResponse);
+}
+
+message KeyEvent {
+  uint64 delay = 1; // 시간 지연(나노초 단위)
+  bytes data = 2;   // HID 리포트 데이터
 }
 
 message StartRequest {
-  // 필요한 필드를 여기에 추가
+  string filename = 1;
 }
 
-message StopRequest {
-  string filename = 1; // 저장할 파일 이름 필드 추가
-}
+message StopRequest {}
+
+message ListRequest {}
+
+message StopReplayRequest {}
 
 message StatusResponse {
   string message = 1;
+}
+
+message MacroEvent {
+  string eventDescription = 1;
+}
+
+message ReplayRequest {
+  string filename = 1;
+}
+
+message SaveFilesResponse {
+  repeated string filenames = 1;  // 파일 이름 목록
+}
+
+message SaveMacroRequest {
+    repeated KeyEvent events = 1;
+    string filename = 2;
+}
+
+message SaveMacroResponse {
+    bool success = 1;
 }

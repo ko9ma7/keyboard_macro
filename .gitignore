@@ -1,4 +1,4 @@
 .vscode
 build
-./generated
-./rspi
+generated/
+rspi/

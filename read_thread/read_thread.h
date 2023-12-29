@@ -9,6 +9,8 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
+#include <functional>
+#include <thread>
 
 class ReadThread {
 public:
@@ -22,6 +24,21 @@ public:
     std::mutex& getLogMutex();
     bool isRecording = false;
 
+    void startMacroReplay(const std::string& filename, std::function<void(const std::string&)> eventCallback = nullptr) {
+        if (macroReplayThread.joinable()) {
+            macroReplayThread.join(); // 이미 실행 중인 쓰레드가 있다면 기다림
+        }
+        macroReplayThread = std::thread(&ReadThread::replayMacro, this, filename, eventCallback);
+    }
+
+    void stopMacroReplay() {
+        if (macroReplayThread.joinable()) {
+            macroReplayThread.join(); // 매크로 재생 중인 쓰레드 중지
+        }
+    }
+
+    void replayMacro(const std::string& logFilename, std::function<void(const std::string&)> eventCallback); // 기본 버전
+
 private:
     std::queue<std::pair<std::chrono::nanoseconds, std::vector<unsigned char>>> logQueue;
     std::mutex logMutex;
@@ -30,6 +47,7 @@ private:
     using TimePoint = std::chrono::high_resolution_clock::time_point;
     TimePoint lastTimestamp;
     int hidg_fd;
+    std::thread macroReplayThread;
 };
 
 #endif // READ_THREAD_H
