@@ -28,6 +28,7 @@ public:
         StatusResponse* response) override;
     grpc::Status SaveMacro(grpc::ServerContext* context, const SaveMacroRequest* request, 
         SaveMacroResponse* response) override;
+    grpc::Status GetMacroDetail(grpc::ServerContext* context, const GetMacroDetailRequest* request, GetMacroDetailResponse* response) override;
 };
 
 #endif // GRPC_THREAD_H

@@ -19,9 +19,6 @@ int ThreadController::RunThread() {
         return 1;
     }
 
-    auto currentTimestamp = std::chrono::high_resolution_clock::now();
-    readThread.setLastTimestamp(currentTimestamp);
-
     std::thread readThreadInstance(&ReadThread::readThreadFunc, &readThread, ctx);
     std::thread loggerThreadInstance(&LoggerThread::loggerThreadFunc, &loggerThread);
 

@@ -41,11 +41,14 @@ grpc::Status InputServiceImpl::ReplayMacroDebug(grpc::ServerContext* context, co
                                                  grpc::ServerWriter<MacroEvent>* writer) {
     std::cout << "매크로 재생 시작: " << request->filename() << " 디버그 모드" << std::endl;
 
-    readThread->startMacroReplay(request->filename(), [writer](const std::string& eventDescription) {
+    std::thread replayThread = readThread->startMacroReplay(request->filename(), [writer](const std::string& eventDescription) {
         MacroEvent event;
         event.set_eventdescription(eventDescription);
         writer->Write(event);
     });
+
+    replayThread.join();  // 스레드가 완료될 때까지 기다림
+    std::cout << "실행 종료: " << request->filename() << " 디버그 모드" << std::endl;
 
     return grpc::Status::OK;
 }
@@ -79,5 +82,19 @@ grpc::Status InputServiceImpl::StopReplay(grpc::ServerContext* context, const St
                             StatusResponse* response) {
     readThread->stopMacroReplay();
     response->set_message("매크로 재생 중단");
+    return grpc::Status::OK;
+}
+
+grpc::Status InputServiceImpl::GetMacroDetail(grpc::ServerContext* context, const GetMacroDetailRequest* request, GetMacroDetailResponse* response) {
+    // 파일에서 매크로 데이터 읽기
+    std::string filename = request->filename();
+    std::vector<KeyMacro::KeyEvent> events = readThread->readMacroFile(filename);
+    
+    for (const auto& event : events) {
+        KeyEvent* proto_event = response->add_events(); // 프로토콜 버퍼의 KeyEvent 객체 생성
+        proto_event->set_delay(event.delay); // delay 설정
+        proto_event->set_data(event.data.data(), event.data.size()); // data 설정
+    }
+
     return grpc::Status::OK;
 }

@@ -5,6 +5,7 @@ service Input {
   rpc StartRecording(StartRequest) returns (StatusResponse);
   rpc StopRecording(StopRequest) returns (StatusResponse);
   rpc StartReplay(ReplayRequest) returns (StatusResponse);
+  rpc GetMacroDetail(GetMacroDetailRequest) returns (GetMacroDetailResponse);
   rpc ReplayMacroDebug(ReplayRequest) returns (stream MacroEvent);
   rpc StopReplay(StopReplayRequest) returns (StatusResponse);
   rpc ListSaveFiles(ListRequest) returns (SaveFilesResponse);
@@ -36,6 +37,14 @@ message MacroEvent {
 
 message ReplayRequest {
   string filename = 1;
+}
+
+message GetMacroDetailRequest {
+  string filename = 1;
+}
+
+message GetMacroDetailResponse {
+  repeated KeyEvent events = 1;
 }
 
 message SaveFilesResponse {
