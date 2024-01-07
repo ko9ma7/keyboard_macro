@@ -22,8 +22,6 @@ public:
     
     void setRecording(bool isRecording) {
         {
-            auto currentTimestamp = std::chrono::high_resolution_clock::now();
-            this->readThread->setLastTimestamp(currentTimestamp);
             std::lock_guard<std::mutex> lock(readThread->getLogMutex());
             this->readThread->isRecording = isRecording;
             this->readThread->isStartingToRecord = isRecording;

@@ -23,31 +23,28 @@ void ReadThread::cb_transfer(struct libusb_transfer* transfer) {
         fprintf(stderr, "Transfer not completed: %d\n", transfer->status);
         return;
     }
-    auto currentTimestamp = std::chrono::high_resolution_clock::now();
-
-    if (self->isStartingToRecord) {
-        self->lastTimestamp = currentTimestamp;
-        self->isStartingToRecord = false;
-    }
-
-    if (self->isRecording) {
-        auto elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTimestamp - self->lastTimestamp);
-
-        std::vector<unsigned char> dataVector(transfer->buffer, transfer->buffer + transfer->actual_length);
-
-        std::unique_lock<std::mutex> lock(self->logMutex);
-        self->logQueue.emplace(elapsedNanoseconds, dataVector);
-        self->logCondition.notify_one();
-    }
-    self->lastTimestamp = currentTimestamp;
 
     // HID report 보내기
-    self->hidg_fd = open(HIDG_READ_PATH, O_RDWR); // HIDG_READ_PATH가 정의되지 않았으므로 임시 경로를 사용
     if (self->hidg_fd < 0) {
         perror("Failed to open /dev/hidg0"); // 경로 수정
     } else {
+        if (self->isStartingToRecord) {
+            self->startTime = std::chrono::high_resolution_clock::now();
+            self->isStartingToRecord = false;
+        }
+
+        auto currentTimestamp = std::chrono::high_resolution_clock::now();
         write(self->hidg_fd, transfer->buffer, transfer->actual_length);
-        close(self->hidg_fd); // 파일 디스크립터를 닫아야 함
+
+        if (self->isRecording) {
+            auto elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTimestamp - self->startTime);
+
+            std::vector<unsigned char> dataVector(transfer->buffer, transfer->buffer + transfer->actual_length);
+
+            std::unique_lock<std::mutex> lock(self->logMutex);
+            self->logQueue.emplace(elapsedNanoseconds, dataVector);
+            self->logCondition.notify_one();
+        }
     }
 
     // 다시 전송을 예약 (계속해서 데이터를 받기 위함)
@@ -100,10 +97,6 @@ void ReadThread::readThreadFunc(libusb_context* ctx) {
     close(hidg_fd);
     libusb_close(handle);
     libusb_free_device_list(devs, 1);
-}
-
-void ReadThread::setLastTimestamp(const std::chrono::high_resolution_clock::time_point& timestamp) {
-    lastTimestamp = timestamp;
 }
 
 std::queue<std::pair<std::chrono::nanoseconds, std::vector<unsigned char>>>& ReadThread::getLogQueue() {
@@ -161,16 +154,25 @@ void ReadThread::replayMacro(const std::string& logFilename, std::function<void(
     // Initial 1 second delay
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    struct timespec req, rem; // 슬립을 위한 timespec 구조체
+    struct timespec startReplayTime;
+    clock_gettime(CLOCK_MONOTONIC, &startReplayTime);
 
-    // Replay events
     for (const auto& event : events) {
-        req.tv_sec = event.delay / 1000000000;  // 초 단위
-        req.tv_nsec = event.delay % 1000000000; // 나노초 단위
+        struct timespec targetTime;
+        targetTime.tv_sec = startReplayTime.tv_sec + (event.delay / 1000000000);
+        targetTime.tv_nsec = startReplayTime.tv_nsec + (event.delay % 1000000000);
 
-        while (clock_nanosleep(CLOCK_MONOTONIC, 0, &req, &rem) == EINTR) {
-            req = rem;
+        // timespec 구조체 정규화
+        if (targetTime.tv_nsec >= 1000000000) {
+            targetTime.tv_sec += 1;
+            targetTime.tv_nsec -= 1000000000;
         }
+
+        struct timespec remaining;
+        while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &targetTime, &remaining) == EINTR) {
+            targetTime = remaining;
+        }   
+        
         ssize_t bytes_written = write(hidg_fd, &event.data[0], event.data.size());
 
         // Write error check

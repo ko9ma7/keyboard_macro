@@ -18,8 +18,6 @@ public:
     void readThreadFunc(libusb_context* ctx);
     static void cb_transfer(struct libusb_transfer* transfer);
 
-    void setLastTimestamp(const std::chrono::high_resolution_clock::time_point& timestamp);
-
     std::queue<std::pair<std::chrono::nanoseconds, std::vector<unsigned char>>>& getLogQueue();
     std::condition_variable& getLogCondition();
     std::mutex& getLogMutex();
@@ -49,7 +47,7 @@ private:
     std::mutex logMutex;
     std::condition_variable logCondition;
     using TimePoint = std::chrono::high_resolution_clock::time_point;
-    TimePoint lastTimestamp;
+    TimePoint startTime;
     int hidg_fd;
     std::thread macroReplayThread;
 };
