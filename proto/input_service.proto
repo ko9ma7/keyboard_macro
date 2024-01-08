@@ -10,6 +10,7 @@ service Input {
   rpc StopReplay(StopReplayRequest) returns (StatusResponse);
   rpc ListSaveFiles(ListRequest) returns (SaveFilesResponse);
   rpc SaveMacro(SaveMacroRequest) returns (SaveMacroResponse);
+  rpc DeleteMacros(DeleteMacrosRequest) returns (StatusResponse);
 }
 
 message KeyEvent {
@@ -58,4 +59,8 @@ message SaveMacroRequest {
 
 message SaveMacroResponse {
     bool success = 1;
+}
+
+message DeleteMacrosRequest {
+  repeated string filenames = 1; // 삭제할 파일 이름 목록
 }

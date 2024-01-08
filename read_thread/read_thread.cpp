@@ -158,6 +158,14 @@ void ReadThread::replayMacro(const std::string& logFilename, std::function<void(
     clock_gettime(CLOCK_MONOTONIC, &startReplayTime);
 
     for (const auto& event : events) {
+        // 종료 요청이 들어왔는지 확인
+        if (stopRequested) {
+            std::cout << "매크로 재생 중단\n";
+            unsigned char stopReport[] = {0, 0, 0, 0, 0, 0, 0, 0};
+            write(hidg_fd, stopReport, sizeof(stopReport));
+            break; // 종료 플래그가 설정되면 루프를 종료
+        }
+
         struct timespec targetTime;
         targetTime.tv_sec = startReplayTime.tv_sec + (event.delay / 1000000000);
         targetTime.tv_nsec = startReplayTime.tv_nsec + (event.delay % 1000000000);

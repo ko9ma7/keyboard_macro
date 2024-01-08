@@ -99,3 +99,12 @@ grpc::Status InputServiceImpl::GetMacroDetail(grpc::ServerContext* context, cons
 
     return grpc::Status::OK;
 }
+
+grpc::Status InputServiceImpl::DeleteMacros(grpc::ServerContext* context, const DeleteMacrosRequest* request, StatusResponse* response) {
+    std::vector<std::string> filenames(request->filenames().begin(), request->filenames().end());
+    
+    loggerThread->deleteMacros(filenames);
+    
+    response->set_message("파일 삭제 완료");
+    return grpc::Status::OK;
+}

@@ -35,6 +35,8 @@ public:
 
     void saveMacroToFile(const std::vector<KeyMacro::KeyEvent>& events, const std::string& filename);
 
+    void deleteMacros(const std::vector<std::string>& filenames);
+
 private:
     std::ofstream file;
     std::mutex fileMutex;
