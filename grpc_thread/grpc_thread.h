@@ -32,6 +32,8 @@ public:
         GetMacroDetailResponse* response) override;
     grpc::Status DeleteMacros(grpc::ServerContext* context, const DeleteMacrosRequest* request,
         StatusResponse* response) override;
+    grpc::Status StartComplexReplay(grpc::ServerContext* context, const ComplexReplayRequest* request,
+        StatusResponse* response) override;
 };
 
 #endif // GRPC_THREAD_H

@@ -15,6 +15,13 @@
 #include <atomic>
 #include "../utils/type.h"
 
+namespace read_thread_ns {
+    struct ReplayRequest {
+        std::string filename;
+        int delayAfter;
+    };
+}
+
 class ReadThread {
 public:
     void readThreadFunc(libusb_context* ctx);
@@ -30,7 +37,7 @@ public:
     /* grpc service */
     std::thread startMacroReplay(const std::string& filename, std::function<void(const std::string&)> eventCallback = nullptr) {
         if (macroReplayThread.joinable()) {
-            macroReplayThread.join();  // 이미 실행 중인 스레드가 있다면 기다림
+            return {};
         }
         macroReplayThread = std::thread(&ReadThread::replayMacro, this, filename, eventCallback);
         stopRequested = false;
@@ -48,6 +55,16 @@ public:
     void replayMacro(const std::string& logFilename, std::function<void(const std::string&)> eventCallback); // 기본 버전
 
     std::vector<KeyMacro::KeyEvent> readMacroFile(const std::string& filename);
+
+    void startComplexRequests(const std::vector<read_thread_ns::ReplayRequest>& requests) {
+        for (const auto& request : requests) {
+            auto thread = startMacroReplay(request.filename, nullptr);  // 올바른 문법으로 std::thread 객체 선언
+            if (stopRequested) {
+                break; // 종료 플래그가 설정되면 루프를 종료
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(request.delayAfter));  // 지정된 시간만큼 지연
+        }
+    }
 
 private:
     std::queue<std::pair<std::chrono::nanoseconds, std::vector<unsigned char>>> logQueue;

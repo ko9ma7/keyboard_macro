@@ -46,7 +46,7 @@ grpc::Status InputServiceImpl::ReplayMacroDebug(grpc::ServerContext* context, co
         event.set_eventdescription(eventDescription);
         writer->Write(event);
     });
-
+    
     replayThread.join();  // 스레드가 완료될 때까지 기다림
     std::cout << "실행 종료: " << request->filename() << " 디버그 모드" << std::endl;
 
@@ -83,6 +83,24 @@ grpc::Status InputServiceImpl::StopReplay(grpc::ServerContext* context, const St
     std::cout<<"종료 요청\n";
     readThread->stopMacroReplay();
     response->set_message("매크로 재생 중단");
+    return grpc::Status::OK;
+}
+
+grpc::Status InputServiceImpl::StartComplexReplay(grpc::ServerContext* context, const ComplexReplayRequest* request, StatusResponse* response) {
+
+    std::cout<<"복잡한 요청 실행\n";
+
+    std::vector<read_thread_ns::ReplayRequest> requests; // ReplayRequest 구조체의 벡터를 생성합니다.
+
+    // ComplexReplayRequest로부터 ReplayRequest 벡터를 구성합니다.
+    for (const auto& task : request->tasks()) {
+        read_thread_ns::ReplayRequest replayRequest = {task.filename(), task.delayafter()};
+        requests.push_back(replayRequest);
+    }
+
+    readThread->startComplexRequests(requests);
+
+    std::cout << "실행 종료: "<< std::endl;
     return grpc::Status::OK;
 }
 

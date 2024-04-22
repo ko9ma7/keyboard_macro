@@ -11,6 +11,7 @@ service Input {
   rpc ListSaveFiles(ListRequest) returns (SaveFilesResponse);
   rpc SaveMacro(SaveMacroRequest) returns (SaveMacroResponse);
   rpc DeleteMacros(DeleteMacrosRequest) returns (StatusResponse);
+  rpc StartComplexReplay(ComplexReplayRequest) returns (StatusResponse);
 }
 
 message KeyEvent {
@@ -63,4 +64,15 @@ message SaveMacroResponse {
 
 message DeleteMacrosRequest {
   repeated string filenames = 1; // 삭제할 파일 이름 목록
+}
+
+message ComplexReplayRequest {
+  repeated ReplayTask tasks = 1; // 재생할 작업 목록
+  int32 repeatCount = 2;         // 작업 목록 반복 횟수
+}
+
+// 재생할 단일 작업(녹화 파일 및 지연)을 나타내는 메시지
+message ReplayTask {
+  string filename = 1; // 녹화 파일 이름
+  int32 delayAfter = 2; // 파일 재생 후 지연 시간(초)
 }
