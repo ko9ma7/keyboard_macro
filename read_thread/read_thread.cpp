@@ -58,6 +58,15 @@ void ReadThread::readThreadFunc(libusb_context* ctx) {
     ssize_t cnt;
     uint8_t endpoint_address;
 
+    int hidg_fd = open(HIDG_MACRO_PATH, O_RDWR);
+
+    if (hidg_fd >= 0) {
+        unsigned char stopReport[] = {0, 0, 0, 0, 0, 0, 0, 0};
+        write(hidg_fd, stopReport, sizeof(stopReport));
+        close(hidg_fd);
+        std::cout<<"reset fd: "<<hidg_fd<<"\n";
+    }
+
     cnt = libusb_get_device_list(ctx, &devs);
     if (cnt < 0) {
         std::cerr << "Failed to get device list." << std::endl;
@@ -78,9 +87,10 @@ void ReadThread::readThreadFunc(libusb_context* ctx) {
         return;
     }
 
-    hidg_fd = open(HIDG_READ_PATH, O_RDWR);
+    
     libusb_fill_interrupt_transfer(transfer, handle, endpoint_address, data, sizeof(data), &ReadThread::cb_transfer, this, 0);
     int r = libusb_submit_transfer(transfer);
+    this->hidg_fd = open(HIDG_READ_PATH, O_RDWR);
     if (r != 0) {
         std::cerr << "Error submitting transfer: " << libusb_error_name(r) << std::endl;
         return;
@@ -94,7 +104,7 @@ void ReadThread::readThreadFunc(libusb_context* ctx) {
         }
     }
 
-    close(hidg_fd);
+    close(this->hidg_fd);
     libusb_close(handle);
     libusb_free_device_list(devs, 1);
 }
@@ -159,7 +169,6 @@ void ReadThread::replayMacro(const std::string& logFilename, std::function<void(
 
     for (const auto& event : events) {
         // 종료 요청이 들어왔는지 확인
-        std::cout<<stopRequested<<'\n';
         if (stopRequested) {
             std::cout << "매크로 재생 중단\n";
             unsigned char stopReport[] = {0, 0, 0, 0, 0, 0, 0, 0};

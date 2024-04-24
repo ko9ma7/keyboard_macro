@@ -36,12 +36,6 @@ public:
 
     /* grpc service */
     void startMacroReplay(const std::string& filename, std::function<void(const std::string&)> eventCallback = nullptr) {
-        // if (macroReplayThread.joinable()) {
-        //     return {};
-        // }
-        // macroReplayThread = std::thread(&ReadThread::replayMacro, this, filename, eventCallback);
-        // stopRequested = false;
-        // return std::move(macroReplayThread);
         if (!macroReplayThread.joinable()) {
             macroReplayThread = std::thread(&ReadThread::replayMacro, this, filename, eventCallback);
             stopRequested = false;
@@ -72,7 +66,6 @@ public:
             for (const auto& request : requests) {
                 startMacroReplay(request.filename, nullptr);
                 waitForCompletion();
-                std::cout<<"매크로 실행 중? "<<stopRequested<<'\n';
                 if (stopRequested) {
                     break; // 종료 플래그가 설정되면 루프를 종료
                 }

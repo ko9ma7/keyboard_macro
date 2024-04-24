@@ -1,1 +1,1 @@
-target remote 10.55.0.1:2000
+gdb -ex "directory ./" -ex "target remote 158.234.0.7:2000"
