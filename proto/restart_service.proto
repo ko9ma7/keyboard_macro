@@ -1,0 +1,12 @@
+// input.proto
+syntax = "proto3";
+
+service Restart {
+  rpc RestartProcess(RestartRequest) returns (RestartResponse);
+}
+
+message RestartRequest {}
+
+message RestartResponse {
+  string message = 1;
+}
