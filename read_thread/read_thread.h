@@ -35,13 +35,23 @@ public:
     bool isStartingToRecord = false;
 
     /* grpc service */
-    std::thread startMacroReplay(const std::string& filename, std::function<void(const std::string&)> eventCallback = nullptr) {
-        if (macroReplayThread.joinable()) {
-            return {};
+    void startMacroReplay(const std::string& filename, std::function<void(const std::string&)> eventCallback = nullptr) {
+        // if (macroReplayThread.joinable()) {
+        //     return {};
+        // }
+        // macroReplayThread = std::thread(&ReadThread::replayMacro, this, filename, eventCallback);
+        // stopRequested = false;
+        // return std::move(macroReplayThread);
+        if (!macroReplayThread.joinable()) {
+            macroReplayThread = std::thread(&ReadThread::replayMacro, this, filename, eventCallback);
+            stopRequested = false;
         }
-        macroReplayThread = std::thread(&ReadThread::replayMacro, this, filename, eventCallback);
-        stopRequested = false;
-        return std::move(macroReplayThread);
+    }
+
+    void waitForCompletion() {
+        if (macroReplayThread.joinable()) {
+            macroReplayThread.join();
+        }
     }
 
     void stopMacroReplay() {
@@ -56,13 +66,16 @@ public:
 
     std::vector<KeyMacro::KeyEvent> readMacroFile(const std::string& filename);
 
-    void startComplexRequests(const std::vector<read_thread_ns::ReplayRequest>& requests) {
-        for (const auto& request : requests) {
-            auto thread = startMacroReplay(request.filename, nullptr);  // 올바른 문법으로 std::thread 객체 선언
-            if (stopRequested) {
-                break; // 종료 플래그가 설정되면 루프를 종료
+    void startComplexRequests(const std::vector<read_thread_ns::ReplayRequest>& requests, int repeatCount) {
+        for (int i = 0; i < repeatCount; ++i) {
+            for (const auto& request : requests) {
+                startMacroReplay(request.filename, nullptr);
+                waitForCompletion();
+                if (stopRequested) {
+                    break; // 종료 플래그가 설정되면 루프를 종료
+                }
+                std::this_thread::sleep_for(std::chrono::seconds(request.delayAfter));  // 지정된 시간만큼 지연
             }
-            std::this_thread::sleep_for(std::chrono::seconds(request.delayAfter));  // 지정된 시간만큼 지연
         }
     }
 
