@@ -67,10 +67,12 @@ public:
     std::vector<KeyMacro::KeyEvent> readMacroFile(const std::string& filename);
 
     void startComplexRequests(const std::vector<read_thread_ns::ReplayRequest>& requests, int repeatCount) {
+        std::cout<<"반복 횟수 "<<repeatCount<<'\n';
         for (int i = 0; i < repeatCount; ++i) {
             for (const auto& request : requests) {
                 startMacroReplay(request.filename, nullptr);
                 waitForCompletion();
+                std::cout<<"매크로 실행 중? "<<stopRequested<<'\n';
                 if (stopRequested) {
                     break; // 종료 플래그가 설정되면 루프를 종료
                 }

@@ -88,7 +88,7 @@ grpc::Status InputServiceImpl::StopReplay(grpc::ServerContext* context, const St
 
 grpc::Status InputServiceImpl::StartComplexReplay(grpc::ServerContext* context, const ComplexReplayRequest* request, StatusResponse* response) {
 
-    std::cout<<"복잡한 요청 실행\n";
+    std::cout<<"복잡한 요청 실행"<<request->repeatcount()<<'\n';
 
     std::vector<read_thread_ns::ReplayRequest> requests; // ReplayRequest 구조체의 벡터를 생성합니다.
 

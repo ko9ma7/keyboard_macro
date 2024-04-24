@@ -159,6 +159,7 @@ void ReadThread::replayMacro(const std::string& logFilename, std::function<void(
 
     for (const auto& event : events) {
         // 종료 요청이 들어왔는지 확인
+        std::cout<<stopRequested<<'\n';
         if (stopRequested) {
             std::cout << "매크로 재생 중단\n";
             unsigned char stopReport[] = {0, 0, 0, 0, 0, 0, 0, 0};
