@@ -11,6 +11,8 @@ grpc::Status RestartServiceImpl::RestartProcess(grpc::ServerContext* context, co
     // 스크립트 실행
     system("sudo /home/ccxz84/restart.sh");
 
+    std::cout << "재시작 완료\n";
+
     // 응답 전송
     response->set_message("Restart initiated.");
 

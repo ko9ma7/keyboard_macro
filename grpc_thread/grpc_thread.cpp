@@ -82,6 +82,7 @@ grpc::Status InputServiceImpl::StopReplay(grpc::ServerContext* context, const St
                             StatusResponse* response) {
     std::cout<<"종료 요청\n";
     readThread->stopMacroReplay();
+    readThread->stopMacroReplay_otherfile();
     response->set_message("매크로 재생 중단");
     return grpc::Status::OK;
 }

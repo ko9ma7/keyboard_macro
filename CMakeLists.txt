@@ -20,10 +20,15 @@ file(GLOB MORE_SOURCES "${CMAKE_SOURCE_DIR}/read_thread/*.cpp" "${CMAKE_SOURCE_D
     "${CMAKE_SOURCE_DIR}/utils/*.cpp" "${CMAKE_SOURCE_DIR}/grpc_thread/*.cpp" "${CMAKE_SOURCE_DIR}/controller/*.cpp")
 list(APPEND KEYBOARD_DRIVER_SOURCES ${MORE_SOURCES})
 
+file(GLOB UTILS_SOURCE "${CMAKE_SOURCE_DIR}/utils/*.cpp")
+
 
 # 새로운 KeyboardDriverRestarter 실행 파일
 set(KEYBOARD_RESTARTER_SOURCES restart.cpp)  # restart.cpp를 포함
 list(APPEND KEYBOARD_RESTARTER_SOURCES ${MORE_SOURCES})
+
+set(KEYBOARD_RUN_MACRO_SOURCES macro.cpp)
+list(APPEND KEYBOARD_RUN_MACRO_SOURCES ${UTILS_SOURCE})
 
 # Protocol Buffers 파일 생성
 set(PROTO_PATH "${CMAKE_SOURCE_DIR}/proto")
@@ -51,15 +56,19 @@ foreach(PROTO_FILE ${PROTO_FILES})
 endforeach()
 add_executable(KeyboardDriver ${KEYBOARD_DRIVER_SOURCES})
 add_executable(KeyboardDriverRestarter ${KEYBOARD_RESTARTER_SOURCES})
+add_executable(RunMacro ${KEYBOARD_RUN_MACRO_SOURCES})
 
 # 라이브러리와 링크
 target_link_libraries(KeyboardDriver PRIVATE ${LIBUSB_LIBRARY} pthread ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
 target_link_libraries(KeyboardDriverRestarter PRIVATE ${LIBUSB_LIBRARY} pthread ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
+target_link_libraries(RunMacro PRIVATE ${LIBUSB_LIBRARY} pthread ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
 
 # 컴파일 옵션
 target_compile_options(KeyboardDriver PRIVATE -Wall -O2)
 target_compile_options(KeyboardDriverRestarter PRIVATE -Wall -O2)
+target_compile_options(RunMacro PRIVATE -Wall -O2)
 
 # 설치 경로
 install(TARGETS KeyboardDriver DESTINATION ${CMAKE_SOURCE_DIR}/rspi)
 install(TARGETS KeyboardDriverRestarter DESTINATION ${CMAKE_SOURCE_DIR}/rspi)
+install(TARGETS RunMacro DESTINATION ${CMAKE_SOURCE_DIR}/rspi)

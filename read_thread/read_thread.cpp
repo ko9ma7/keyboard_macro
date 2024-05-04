@@ -13,6 +13,7 @@
 #include <mutex>
 #include <condition_variable>
 #include "../utils/keyboard_util.h"
+#include <random>
 #include "read_thread.h"
 #include "../utils/type.h"
 
@@ -29,15 +30,30 @@ void ReadThread::cb_transfer(struct libusb_transfer* transfer) {
         perror("Failed to open /dev/hidg0"); // 경로 수정
     } else {
         if (self->isStartingToRecord) {
-            self->startTime = std::chrono::high_resolution_clock::now();
+            struct timespec currentTime;
+            clock_gettime(CLOCK_MONOTONIC, &currentTime);
+            self->startTime = currentTime;
+            self->prevTime = currentTime;
             self->isStartingToRecord = false;
         }
 
-        auto currentTimestamp = std::chrono::high_resolution_clock::now();
+        struct timespec currentTimestamp;
+        clock_gettime(CLOCK_MONOTONIC, &currentTimestamp);
+
         write(self->hidg_fd, transfer->buffer, transfer->actual_length);
 
         if (self->isRecording) {
-            auto elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTimestamp - self->startTime);
+            struct timespec elapsed;
+            elapsed.tv_sec = currentTimestamp.tv_sec - self->startTime.tv_sec;
+            elapsed.tv_nsec = currentTimestamp.tv_nsec - self->startTime.tv_nsec;
+            if (elapsed.tv_nsec < 0) {
+                elapsed.tv_sec--;
+                elapsed.tv_nsec += 1000000000;
+            }
+            
+            uint64_t elapsedNanoseconds = elapsed.tv_sec * 1000000000LL + elapsed.tv_nsec;
+
+            self->prevTime = currentTimestamp;
 
             std::vector<unsigned char> dataVector(transfer->buffer, transfer->buffer + transfer->actual_length);
 
@@ -164,8 +180,8 @@ void ReadThread::replayMacro(const std::string& logFilename, std::function<void(
     // Initial 1 second delay
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    struct timespec startReplayTime;
-    clock_gettime(CLOCK_MONOTONIC, &startReplayTime);
+    struct timespec currentTime;
+    clock_gettime(CLOCK_MONOTONIC, &currentTime);
 
     for (const auto& event : events) {
         // 종료 요청이 들어왔는지 확인
@@ -177,8 +193,12 @@ void ReadThread::replayMacro(const std::string& logFilename, std::function<void(
         }
 
         struct timespec targetTime;
-        targetTime.tv_sec = startReplayTime.tv_sec + (event.delay / 1000000000);
-        targetTime.tv_nsec = startReplayTime.tv_nsec + (event.delay % 1000000000);
+        
+        targetTime.tv_sec = currentTime.tv_sec + (event.delay / 1000000000);
+        targetTime.tv_nsec = currentTime.tv_nsec + (event.delay % 1000000000);
+
+        // int randomDelay = distribution(generator);  // 난수 생성
+        // targetTime.tv_nsec += randomDelay;  // 타겟 시간에 난수 추가
 
         // timespec 구조체 정규화
         if (targetTime.tv_nsec >= 1000000000) {
