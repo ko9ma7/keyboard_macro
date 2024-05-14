@@ -1,95 +1,157 @@
 #include "bluetooth_registry.h"
 
 void BluetoothRegistry::registerAllDevices() {
-    GError* error = NULL;
-    GDBusProxy* proxy = g_dbus_proxy_new_sync(bus,
-                                                G_DBUS_PROXY_FLAGS_NONE,
-                                                NULL, /* GDBusInterfaceInfo */
-                                                "org.bluez",
-                                                "/",
-                                                "org.freedesktop.DBus.ObjectManager",
-                                                NULL, /* GCancellable */
-                                                &error);
+    sd_bus_error error = SD_BUS_ERROR_NULL;
+    sd_bus_message* m = nullptr;
+    int r;
 
-    if (!proxy) {
-        std::cerr << "Failed to create proxy for Object Manager: " << error->message << std::endl;
-        g_error_free(error);
+    // Get the managed objects from BlueZ
+    r = sd_bus_call_method(bus,
+                           "org.bluez",
+                           "/",
+                           "org.freedesktop.DBus.ObjectManager",
+                           "GetManagedObjects",
+                           &error,
+                           &m,
+                           "");
+    if (r < 0) {
+        std::cerr << "Failed to call GetManagedObjects: " << error.message << std::endl;
+        sd_bus_error_free(&error);
         return;
     }
 
-    GVariant* result = g_dbus_proxy_call_sync(proxy,
-                                                "GetManagedObjects",
-                                                NULL, /* parameters */
-                                                G_DBUS_CALL_FLAGS_NONE,
-                                                -1, /* timeout_msec */
-                                                NULL, /* GCancellable */
-                                                &error);
-
-    if (!result) {
-        std::cerr << "Error calling GetManagedObjects: " << error->message << std::endl;
-        g_error_free(error);
-        g_object_unref(proxy);
-        return;
+    const char* path;
+    sd_bus_message_enter_container(m, 'a', "{oa{sa{sv}}}");
+    while (sd_bus_message_enter_container(m, 'e', "oa{sa{sv}}") > 0) {
+        sd_bus_message_read(m, "o", &path);
+        std::cout << "Register device: " << path << std::endl;
+        readDevicePath(path, m);
+        addDevice(path);
+        sd_bus_message_exit_container(m); // Exit 'e'
     }
+    sd_bus_message_exit_container(m); // Exit 'a'
 
-    GVariantIter* iter;
-    gchar* object_path;
-    GVariant* interfaces_and_properties;
-
-    g_variant_get(result, "(a{oa{sa{sv}}})", &iter);
-    while (g_variant_iter_loop(iter, "{o@a{sa{sv}}}", &object_path, &interfaces_and_properties)) {
-        std::cout<<"register device: "<<object_path<<'\n';
-        addDevice(object_path, interfaces_and_properties);
-    }
-
-    g_variant_iter_free(iter);
-    g_variant_unref(result);
-    g_object_unref(proxy);
+    sd_bus_message_unref(m);
 }
 
-void BluetoothRegistry::addDevice(const gchar* devicePath, GVariant* interfaces_and_properties) {
-    // 속성 조회 전에 로그를 출력하여 어떤 인터페이스와 속성이 있는지 확인
-    GVariantIter iter;
-    gchar *key;
-    GVariant *value;
-    g_variant_iter_init(&iter, interfaces_and_properties);
-    while (g_variant_iter_next(&iter, "{sv}", &key, &value)) {
-        std::cout << "Found property: " << key << std::endl;
-        g_free(key);
-        g_variant_unref(value);
+void BluetoothRegistry::readDevicePath(const char* devicePath, sd_bus_message* interfaces_and_properties) {
+    const char* interface_name;
+    const char* property_name;
+
+    std::map<std::string, std::string> properties;
+
+    sd_bus_message_enter_container(interfaces_and_properties, 'a', "{sa{sv}}");
+    while (sd_bus_message_enter_container(interfaces_and_properties, 'e', "sa{sv}") > 0) {
+        sd_bus_message_read(interfaces_and_properties, "s", &interface_name);
+        sd_bus_message_enter_container(interfaces_and_properties, 'a', "{sv}");
+        while (sd_bus_message_enter_container(interfaces_and_properties, 'e', "sv") > 0) {
+            sd_bus_message_read(interfaces_and_properties, "s", &property_name);
+            const char* value_type = sd_bus_message_get_signature(interfaces_and_properties, true);
+
+            if (strcmp(value_type, "s") == 0) {
+                const char* value;
+                sd_bus_message_enter_container(interfaces_and_properties, 'v', "s");
+                sd_bus_message_read(interfaces_and_properties, "s", &value);
+                properties[property_name] = value;
+                std::cout << "Found property: " << property_name << " = " << value << std::endl;
+                sd_bus_message_exit_container(interfaces_and_properties); // Exit 'v'
+            } else {
+                sd_bus_message_skip(interfaces_and_properties, "v");
+            }
+            sd_bus_message_exit_container(interfaces_and_properties); // Exit 'e'
+        }
+        sd_bus_message_exit_container(interfaces_and_properties); // Exit 'a'
+        sd_bus_message_exit_container(interfaces_and_properties); // Exit 'e'
     }
+    sd_bus_message_exit_container(interfaces_and_properties); // Exit 'a'
+}
 
-    // 소켓 경로 속성 조회
-    GVariant* ctrl_path_prop = g_variant_lookup_value(interfaces_and_properties, "SocketPathCtrl", G_VARIANT_TYPE_STRING);
-    GVariant* intr_path_prop = g_variant_lookup_value(interfaces_and_properties, "SocketPathIntr", G_VARIANT_TYPE_STRING);
-
-    if (!ctrl_path_prop || !intr_path_prop) {
-        std::cerr << "Socket paths not found for device: " << devicePath << std::endl;
+void BluetoothRegistry::addDevice(const char* devicePath) {
+    if (devices.find(devicePath) != devices.end()) {
+        std::cerr << "Device already registered: " << devicePath << std::endl;
         return;
     }
 
-    std::string ctrl_path = g_variant_get_string(ctrl_path_prop, NULL);
-    std::string intr_path = g_variant_get_string(intr_path_prop, NULL);
+    sd_bus_error error = SD_BUS_ERROR_NULL;
+    sd_bus_message* m = nullptr;
+    int r;
+
+    // Get the SocketPathCtrl property
+    r = sd_bus_get_property(bus,
+                            "org.bluez",
+                            devicePath,
+                            "org.bluez.InputHost1",
+                            "SocketPathCtrl",
+                            &error,
+                            &m,
+                            "s");
+
+    if (r < 0) {
+        std::cerr << "Failed to get property 'SocketPathCtrl': " << error.message << std::endl;
+        sd_bus_error_free(&error);
+        if (m) sd_bus_message_unref(m);
+        return;
+    }
+
+    const char* ctrl_path;
+    sd_bus_message_read(m, "s", &ctrl_path);
+    sd_bus_message_unref(m);
+
+    // Get the SocketPathIntr property
+    r = sd_bus_get_property(bus,
+                            "org.bluez",
+                            devicePath,
+                            "org.bluez.InputHost1",
+                            "SocketPathIntr",
+                            &error,
+                            &m,
+                            "s");
+
+    if (r < 0) {
+        std::cerr << "Failed to get property 'SocketPathIntr': " << error.message << std::endl;
+        sd_bus_error_free(&error);
+        if (m) sd_bus_message_unref(m);
+        return;
+    }
+
+    const char* intr_path;
+    sd_bus_message_read(m, "s", &intr_path);
+    sd_bus_message_unref(m);
 
     auto device = std::make_shared<BluetoothDevice>(ctrl_path, intr_path);
-    devices.push_back(device);
+    devices[devicePath] = device;
     std::cout << "Device added: " << devicePath << " with control path: " << ctrl_path << " and interrupt path: " << intr_path << std::endl;
+}
 
-    g_variant_unref(ctrl_path_prop);
-    g_variant_unref(intr_path_prop);
+void BluetoothRegistry::sendMessageAll(const void* report, size_t size) {
+    for (const auto& [devicePath, device] : devices) {
+        device->sendKeyPress(report, size);
+    }
+}
+
+void BluetoothRegistry::removeDevice(const char* devicePath) {
+    auto it = devices.find(devicePath);
+    if (it != devices.end()) {
+        devices.erase(it);
+        std::cout << "Device removed: " << devicePath << std::endl;
+    } else {
+        std::cerr << "Device not found: " << devicePath << std::endl;
+    }
 }
 
 
-int main() {
-    GError* error = nullptr;
-    GDBusConnection* connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, nullptr, &error);
-    if (error != nullptr) {
-        std::cerr << "Failed to connect to D-Bus system bus: " << error->message << std::endl;
-        g_error_free(error);
-        return 1;
-    }
+// int main() {
+//     sd_bus* bus = nullptr;
+//     int r = sd_bus_open_system(&bus);
+//     if (r < 0) {
+//         std::cerr << "Failed to connect to system bus: " << strerror(-r) << std::endl;
+//         return 1;
+//     }
 
-    BluetoothRegistry reg(connection);
+//     BluetoothRegistry registry(bus);
 
-    reg.registerAllDevices();
-} 
+//     registry.registerAllDevices();
+
+//     sd_bus_unref(bus);
+//     return 0;
+// }

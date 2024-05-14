@@ -9,6 +9,7 @@
 #include <optional>
 #include <chrono>
 #include "bluetooth_agent.h"
+#include "bluetooth_registry.h"
 
 using namespace boost;
 using namespace std;
@@ -22,7 +23,7 @@ using boost::asio::steady_timer;
 #define ADAPTER_INTERFACE "org.bluez.Adapter1"
 #define DEVICE_INTERFACE "org.bluez.Device1"
 #define OBJECT_MANAGER_INTERFACE "org.freedesktop.DBus.ObjectManager"
-#define DEVICE_NAME "Bluetooth Keyboard"
+#define DEVICE_NAME "Bluetooth Keyboard12"
 #define UUID "00001124-0000-1000-8000-00805f9b34fb"
 
 class BluetoothAdapter: public std::enable_shared_from_this<BluetoothAdapter> {
@@ -32,16 +33,13 @@ public:
 
     boost::asio::io_context& io;
     sd_bus *bus = nullptr;
-    // BluetoothDeviceRegistry& bluetoothDevices_;
-    // HIDDeviceRegistry& hidDevices_;
+    boost::asio::posix::stream_descriptor sd_bus_fd;
     bool agentPublished;
     std::shared_ptr<BluetoothAgent> agent;
     bool omProxyInitialised;
     bool initialisingAdapter;
-    // std::optional<std::chrono::steady_clock::time_point> scanStartTime;
-    // std::optional<std::chrono::steady_clock::time_point> discoverableStartTime;
-    // std::function<void(Action)> onAgentActionHandler_;
-    // std::function<void()> onInterfaceChangedHandler_;
+
+    std::shared_ptr<BluetoothRegistry> registry;
 
     void init();
 
@@ -78,11 +76,15 @@ public:
 
     // static const GDBusInterfaceVTable interface_vtable;
 
-    const sd_bus_vtable bluetooth_vtable[];
+    static const sd_bus_vtable bluetooth_vtable[];
 
     bool createAgent();
 
     bool registerAgentInBluez();
 
     bool setDefaultAgent();
+
+    void on_sd_bus_event(const boost::system::error_code& ec, std::size_t bytes_transferred);
+    void sd_bus_io_handler();
+
 };

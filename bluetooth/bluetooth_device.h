@@ -14,14 +14,13 @@ private:
     bool sockets_connected = false;
 
 public:
-    BluetoothDevice(const std::string& ctrlPath, const std::string& intrPath) 
-        : control_socket_path(ctrlPath), interrupt_socket_path(intrPath) {}
+    BluetoothDevice(const std::string& ctrlPath, const std::string& intrPath);
 
     void connectSockets();
 
     int setNonBlocking(int sock);
 
-    void sendKeyPress(uint8_t* report);
+    void sendKeyPress(const void* report, size_t size);
 
     void releaseKeysAndCloseSockets();
 

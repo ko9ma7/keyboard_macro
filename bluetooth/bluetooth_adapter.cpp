@@ -1,17 +1,45 @@
 #include <systemd/sd-bus.h>
 #include "bluetooth_adapter.h"
 
+const sd_bus_vtable BluetoothAdapter::bluetooth_vtable[] = {
+    SD_BUS_VTABLE_START(0),
+    SD_BUS_METHOD("AuthorizeService", "os", "s", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
+    SD_BUS_METHOD("RequestConfirmation", "ou", "s", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
+    SD_BUS_METHOD("RequestAuthorization", "o", "", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
+    SD_BUS_METHOD("RequestPinCode", "o", "s", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
+    SD_BUS_METHOD("RequestPasskey", "o", "u", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
+    SD_BUS_METHOD("Cancel", "", "", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
+    SD_BUS_METHOD("Release", "", "", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
+    SD_BUS_VTABLE_END
+};
+
+void BluetoothAdapter::on_sd_bus_event(const boost::system::error_code& ec, std::size_t bytes_transferred) {
+    if (!ec) {
+        sd_bus_process(bus, nullptr);
+        sd_bus_flush(bus);
+        sd_bus_io_handler();
+    } else {
+        std::cerr << "Error on sd_bus event: " << ec.message() << std::endl;
+    }
+}
+
+void BluetoothAdapter::sd_bus_io_handler() {
+    sd_bus_fd.async_read_some(boost::asio::null_buffers(), 
+        std::bind(&BluetoothAdapter::on_sd_bus_event, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+}
+
 int BluetoothAdapter::handle_method_call(sd_bus_message *m, void *userdata, sd_bus_error *ret_error) {
     BluetoothAdapter *self = static_cast<BluetoothAdapter*>(userdata);
     const char *member = sd_bus_message_get_member(m);
 
+    std::cout<<"handle_method\n";
+
     if (strcmp(member, "AuthorizeService") == 0) {
         const char *device, *uuid;
         if (sd_bus_message_read(m, "os", &device, &uuid) < 0) {
-            sd_bus_reply_method_errorf(m, "Invalid parameters for AuthorizeService");
+            sd_bus_reply_method_errorf(m, "org.freedesktop.DBus.Error.InvalidArgs", "Invalid parameters for AuthorizeService");
             return -1;
         }
-        // Example: self->agent->AuthorizeService(std::string(device), std::string(uuid));
         std::cout << "AuthorizeService called with device: " << device << " and UUID: " << uuid << std::endl;
         sd_bus_reply_method_return(m, "s", "Service Authorized");
     } 
@@ -19,55 +47,49 @@ int BluetoothAdapter::handle_method_call(sd_bus_message *m, void *userdata, sd_b
         const char *device;
         uint32_t passkey;
         if (sd_bus_message_read(m, "ou", &device, &passkey) < 0) {
-            sd_bus_reply_method_errorf(m, "Invalid parameters for RequestConfirmation");
+            sd_bus_reply_method_errorf(m, "org.freedesktop.DBus.Error.InvalidArgs", "Invalid parameters for RequestConfirmation");
             return -1;
         }
-        // Example: self->agent->RequestConfirmation(std::string(device), passkey);
         std::cout << "RequestConfirmation called with device: " << device << " and passkey: " << passkey << std::endl;
         sd_bus_reply_method_return(m, "s", "Confirmation Requested");
     } 
     else if (strcmp(member, "RequestAuthorization") == 0) {
         const char *device;
         if (sd_bus_message_read(m, "o", &device) < 0) {
-            sd_bus_reply_method_errorf(m, "Invalid parameters for RequestAuthorization");
+            sd_bus_reply_method_errorf(m, "org.freedesktop.DBus.Error.InvalidArgs", "Invalid parameters for RequestAuthorization");
             return -1;
         }
-        // Example: self->agent->RequestAuthorization(std::string(device));
         std::cout << "RequestAuthorization called for device: " << device << std::endl;
         sd_bus_reply_method_return(m, "s", "Authorization Requested");
     } 
     else if (strcmp(member, "RequestPinCode") == 0) {
         const char *device;
         if (sd_bus_message_read(m, "o", &device) < 0) {
-            sd_bus_reply_method_errorf(m, "Invalid parameters for RequestPinCode");
+            sd_bus_reply_method_errorf(m, "org.freedesktop.DBus.Error.InvalidArgs", "Invalid parameters for RequestPinCode");
             return -1;
         }
-        // Example: self->agent->RequestPinCode(std::string(device));
         std::cout << "RequestPinCode called for device: " << device << std::endl;
         sd_bus_reply_method_return(m, "s", "1234");  // Example pin code
     } 
     else if (strcmp(member, "RequestPasskey") == 0) {
         const char *device;
         if (sd_bus_message_read(m, "o", &device) < 0) {
-            sd_bus_reply_method_errorf(m, "Invalid parameters for RequestPasskey");
+            sd_bus_reply_method_errorf(m, "org.freedesktop.DBus.Error.InvalidArgs", "Invalid parameters for RequestPasskey");
             return -1;
         }
-        // Example: self->agent->RequestPasskey(std::string(device));
         std::cout << "RequestPasskey called for device: " << device << std::endl;
         sd_bus_reply_method_return(m, "u", 123456);  // Example passkey
     } 
     else if (strcmp(member, "Cancel") == 0) {
-        // Example: self->agent->Cancel();
         std::cout << "Cancel called" << std::endl;
         sd_bus_reply_method_return(m, "s", "Cancelled");
     } 
     else if (strcmp(member, "Release") == 0) {
-        // Example: handle release logic
         std::cout << "Release called" << std::endl;
         sd_bus_reply_method_return(m, "s", "Released");
     } 
     else {
-        sd_bus_reply_method_errorf(m, "Unknown method: %s", member);
+        sd_bus_reply_method_errorf(m, "org.freedesktop.DBus.Error.UnknownMethod", "Unknown method: %s", member);
         std::cerr << "Unknown method call: " << member << std::endl;
         return -1;
     }
@@ -76,18 +98,8 @@ int BluetoothAdapter::handle_method_call(sd_bus_message *m, void *userdata, sd_b
 }
 
 BluetoothAdapter::BluetoothAdapter(boost::asio::io_context& io, sd_bus* bus)
-: io(io), bus(bus), agentPublished(false), initialisingAdapter(false) {
-    sd_bus_vtable bluetooth_vtable[] = {
-        SD_BUS_VTABLE_START(0),
-        SD_BUS_METHOD("AuthorizeService", "os", "s", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
-        SD_BUS_METHOD("RequestConfirmation", "ou", "s", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
-        SD_BUS_METHOD("RequestAuthorization", "o", "", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
-        SD_BUS_METHOD("RequestPinCode", "o", "s", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
-        SD_BUS_METHOD("RequestPasskey", "o", "u", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
-        SD_BUS_METHOD("Cancel", "", "", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
-        SD_BUS_METHOD("Release", "", "", &BluetoothAdapter::handle_method_call, SD_BUS_VTABLE_UNPRIVILEGED),
-        SD_BUS_VTABLE_END
-    };
+: io(io), bus(bus), agentPublished(false), sd_bus_fd(io, sd_bus_get_fd(bus)), initialisingAdapter(false) {
+    registry = std::make_shared<BluetoothRegistry>(bus);
 }
 
 BluetoothAdapter::~BluetoothAdapter() {
@@ -95,6 +107,7 @@ BluetoothAdapter::~BluetoothAdapter() {
 }
 
 void BluetoothAdapter::init() {
+    sd_bus_io_handler();
     wait_bt_service_run();
     setup_dbus_proxy();
     waitTillAdapterPresentThenInitSync();
@@ -142,18 +155,17 @@ void BluetoothAdapter::check_bt_service_running() {
 
 bool BluetoothAdapter::adapterExists() {
     sd_bus_error error = SD_BUS_ERROR_NULL;
-    sd_bus_message *response = nullptr;
-    const char *version;
+    char *version = nullptr;  // const char*를 char*로 변경
     int ret;
 
-    // Call to get the property "Version" from the BlueZ Adapter interface
+    // BlueZ 어댑터 인터페이스에서 "Version" 속성을 가져오기 위한 호출
     ret = sd_bus_get_property_string(bus,
-                                     "org.bluez",                // Service name
-                                     ADAPTER_OBJECT,             // Object path
-                                     ADAPTER_INTERFACE,          // Interface name
-                                     "Version",                  // Property name
-                                     &error,                     // Error handling
-                                     &version);                  // Output parameter for the property value
+                                     "org.bluez",                // 서비스 이름
+                                     ADAPTER_OBJECT,             // 오브젝트 경로
+                                     ADAPTER_INTERFACE,          // 인터페이스 이름
+                                     "Version",                  // 속성 이름
+                                     &error,                     // 오류 처리
+                                     &version);                  // 속성 값의 출력 매개변수
 
     if (ret < 0) {
         std::cerr << "Failed to read 'Version' property: " << error.message << std::endl;
@@ -161,14 +173,14 @@ bool BluetoothAdapter::adapterExists() {
         return false;
     }
 
-    // Compare the version string to check if the adapter exists
+    // 버전 문자열을 비교하여 어댑터가 존재하는지 확인
     bool exists = (std::string(version) == "Hacked");
-    sd_bus_error_free(&error); // Clean up the error object
+    free(version);  // version 문자열에 할당된 메모리를 해제
+    sd_bus_error_free(&error); // 오류 객체 정리
     return exists;
 }
 
 void BluetoothAdapter::waitTillAdapterPresentThenInitSync() {
-    std::cout<<"initing?? "<<initialisingAdapter<<"\n";
     if (initialisingAdapter) {
         return; // already initing
     }
@@ -243,8 +255,6 @@ int BluetoothAdapter::onInterfacesAdded(sd_bus_message *m, void *userdata, sd_bu
                 break;
             }
 
-            std::cout << "Property: " << property_name << std::endl;
-
             // Skipping actual property value reading for brevity
             sd_bus_message_skip(m, "v");
 
@@ -256,6 +266,8 @@ int BluetoothAdapter::onInterfacesAdded(sd_bus_message *m, void *userdata, sd_bu
     }
 
     sd_bus_message_exit_container(m);  // Exit the array of interfaces
+
+    self->registry->addDevice(path);
 
     return 1;
 }
@@ -287,11 +299,12 @@ int BluetoothAdapter::onInterfacesRemoved(sd_bus_message *m, void *userdata, sd_
 
     sd_bus_message_exit_container(m);
 
+    self->registry->removeDevice(path);
+
     return 1;
 }
 
 void BluetoothAdapter::waitTillAdapterPresentThenInit() {
-    std::cout<<"asdfasf\n";
     while (!adapterExists()) {
         std::cout << "No BT adapter. Waiting..." << std::endl;
         std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -301,6 +314,8 @@ void BluetoothAdapter::waitTillAdapterPresentThenInit() {
 
     setAlias(DEVICE_NAME);
     setDiscoverable(true);
+
+    registry->registerAllDevices();
 }
 
 bool BluetoothAdapter::createAgent() {
@@ -336,7 +351,7 @@ bool BluetoothAdapter::registerAgentInBluez() {
                            &error,
                            &m,
                            "os",
-                           DBUS_PATH_AGENT,
+                           "/org/bluez/agent",
                            "KeyboardDisplay");
 
     if (r < 0) {
@@ -366,7 +381,7 @@ bool BluetoothAdapter::setDefaultAgent() {
                            &error,
                            &m,
                            "o",
-                           DBUS_PATH_AGENT);
+                           "/org/bluez/agent");
 
     if (r < 0) {
         std::cerr << "Failed to set default agent: " << error.message << std::endl;
@@ -383,7 +398,10 @@ bool BluetoothAdapter::setDefaultAgent() {
 
 void BluetoothAdapter::registerAgent() {
     if (!agentPublished) {
-        createAgent();
+        if (!createAgent()) {
+            std::cerr << "Failed to create agent." << std::endl;
+            return;
+        }
         if (!registerAgentInBluez()) {
             std::cerr << "Failed to register agent in Bluez." << std::endl;
             return;

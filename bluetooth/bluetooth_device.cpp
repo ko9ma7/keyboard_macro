@@ -37,6 +37,8 @@ void BluetoothDevice::connectSockets() {
         return;
     }
 
+    setNonBlocking(interrupt_socket);
+
     sockets_connected = true;
     std::cout << "Sockets connected successfully." << '\n';
 }
@@ -56,7 +58,7 @@ int BluetoothDevice::setNonBlocking(int sock) {
     return 0;
 }
 
-void BluetoothDevice::sendKeyPress(uint8_t* report) {
+void BluetoothDevice::sendKeyPress(const void* report, size_t size) {
     if (report == nullptr) {
         return;
     }
@@ -64,7 +66,8 @@ void BluetoothDevice::sendKeyPress(uint8_t* report) {
         std::cerr << "Sockets not connected. Cannot send key press." << '\n';
         return;
     }
-    if (send(interrupt_socket, report, sizeof(report), 0) == -1) {
+
+    if (send(interrupt_socket, report, size, 0) == -1) {
         std::cerr << "Failed to send key press: " << strerror(errno) <<'\n';
     }
 }
@@ -103,4 +106,9 @@ void BluetoothDevice::disconnectSockets() {
     }
 
     sockets_connected = false;  // 연결 상태를 업데이트
+}
+
+BluetoothDevice::BluetoothDevice(const std::string& ctrlPath, const std::string& intrPath) 
+: control_socket_path(ctrlPath), interrupt_socket_path(intrPath) {
+    connectSockets();
 }

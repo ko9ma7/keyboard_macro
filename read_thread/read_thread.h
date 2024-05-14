@@ -31,6 +31,10 @@ namespace read_thread_ns {
 class ReadThread {
 public:
 
+    virtual void init() {
+
+    }
+
     pid_t runMacroPid = -1;
 
     void readThreadFunc(libusb_context* ctx);
@@ -114,19 +118,19 @@ public:
 
     std::vector<KeyMacro::KeyEvent> readMacroFile(const std::string& filename);
 
-    void startComplexRequests(const std::vector<read_thread_ns::ReplayRequest>& requests, int repeatCount) {
+    virtual void startComplexRequests(const std::vector<read_thread_ns::ReplayRequest>& requests, int repeatCount) {
         std::cout<<"반복 횟수 "<<repeatCount<<'\n';
         for (int i = 0; i < repeatCount; ++i) {
             for (const auto& request : requests) {
                 startMacroReplay_otherfile(request.filename);
                 bool stopSign = waitForCompletion_otherfile();
                 if (stopSign) {
-                    int hidg_fd = open(HIDG_MACRO_PATH, O_RDWR);
+                    int hidg_fd = outputOpen(HIDG_MACRO_PATH, O_RDWR);
 
                     if (hidg_fd >= 0) {
                         unsigned char stopReport[] = {0, 0, 0, 0, 0, 0, 0, 0};
                         write(hidg_fd, stopReport, sizeof(stopReport));
-                        close(hidg_fd);
+                        outputClose(hidg_fd);
                         std::cout<<"reset fd: "<<hidg_fd<<"\n";
                     }
                     break; // 종료 플래그가 설정되면 루프를 종료
@@ -135,6 +139,20 @@ public:
             }
         }
     }
+
+    virtual int outputWrite(int fd, const void *buf, size_t count) {
+        return write(fd, buf, count);
+    }
+    
+    virtual int outputOpen(const char* path, int flags) {
+        return open(path, flags);
+    }
+
+    virtual int outputClose(int fd) {
+        return close(fd);
+    }
+
+    friend class BluetoothReadThread;
 
 private:
     std::queue<std::pair<std::chrono::nanoseconds, std::vector<unsigned char>>> logQueue;

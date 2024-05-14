@@ -40,7 +40,7 @@ void ReadThread::cb_transfer(struct libusb_transfer* transfer) {
         struct timespec currentTimestamp;
         clock_gettime(CLOCK_MONOTONIC, &currentTimestamp);
 
-        write(self->hidg_fd, transfer->buffer, transfer->actual_length);
+        self->outputWrite(self->hidg_fd, transfer->buffer, transfer->actual_length);
 
         if (self->isRecording) {
             struct timespec elapsed;
@@ -74,12 +74,12 @@ void ReadThread::readThreadFunc(libusb_context* ctx) {
     ssize_t cnt;
     uint8_t endpoint_address;
 
-    int hidg_fd = open(HIDG_MACRO_PATH, O_RDWR);
+    int hidg_fd = outputOpen(HIDG_MACRO_PATH, O_RDWR);
 
     if (hidg_fd >= 0) {
         unsigned char stopReport[] = {0, 0, 0, 0, 0, 0, 0, 0};
-        write(hidg_fd, stopReport, sizeof(stopReport));
-        close(hidg_fd);
+        outputWrite(hidg_fd, stopReport, sizeof(stopReport));
+        outputClose(hidg_fd);
         std::cout<<"reset fd: "<<hidg_fd<<"\n";
     }
 
@@ -106,7 +106,7 @@ void ReadThread::readThreadFunc(libusb_context* ctx) {
     
     libusb_fill_interrupt_transfer(transfer, handle, endpoint_address, data, sizeof(data), &ReadThread::cb_transfer, this, 0);
     int r = libusb_submit_transfer(transfer);
-    this->hidg_fd = open(HIDG_READ_PATH, O_RDWR);
+    this->hidg_fd = outputOpen(HIDG_READ_PATH, O_RDWR);
     if (r != 0) {
         std::cerr << "Error submitting transfer: " << libusb_error_name(r) << std::endl;
         return;
@@ -120,7 +120,7 @@ void ReadThread::readThreadFunc(libusb_context* ctx) {
         }
     }
 
-    close(this->hidg_fd);
+    outputClose(this->hidg_fd);
     libusb_close(handle);
     libusb_free_device_list(devs, 1);
 }
@@ -171,7 +171,7 @@ void ReadThread::replayMacro(const std::string& logFilename, std::function<void(
     logFile.close();
 
     // Open HID device
-    int hidg_fd = open(HIDG_MACRO_PATH, O_RDWR);
+    int hidg_fd = outputOpen(HIDG_MACRO_PATH, O_RDWR);
     if (hidg_fd < 0) {
         perror("Failed to open " HIDG_MACRO_PATH);
         return;
@@ -188,7 +188,7 @@ void ReadThread::replayMacro(const std::string& logFilename, std::function<void(
         if (stopRequested) {
             std::cout << "매크로 재생 중단\n";
             unsigned char stopReport[] = {0, 0, 0, 0, 0, 0, 0, 0};
-            write(hidg_fd, stopReport, sizeof(stopReport));
+            outputWrite(hidg_fd, stopReport, sizeof(stopReport));
             break; // 종료 플래그가 설정되면 루프를 종료
         }
 
@@ -211,7 +211,7 @@ void ReadThread::replayMacro(const std::string& logFilename, std::function<void(
             targetTime = remaining;
         }   
         
-        ssize_t bytes_written = write(hidg_fd, &event.data[0], event.data.size());
+        ssize_t bytes_written = outputWrite(hidg_fd, &event.data[0], event.data.size());
 
         // Write error check
         if (bytes_written == -1) {
@@ -234,7 +234,7 @@ void ReadThread::replayMacro(const std::string& logFilename, std::function<void(
     }
 
     // Close HID device
-    close(hidg_fd);
+    outputClose(hidg_fd);
 
     return;
 }

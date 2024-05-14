@@ -4,28 +4,27 @@
 #include "../read_thread/read_thread.h"
 #include "../logger_thread/logger_thread.h"
 #include "../grpc_thread/grpc_thread.h"
-
-#define INJECT_DEPENDENCY(FIELD, OBJECT) \
-    OBJECT.FIELD = &FIELD;
+#include <memory>
 
 class ThreadController {
 public:
     ThreadController() {
-        injectDependencies();
+        
     }
 
     int RunThread();
+    int RunBluetoothThread();
     void RunServer();
 
 private:
     LoggerThread loggerThread;
-    ReadThread readThread;
+    std::shared_ptr<ReadThread> readThread;
     InputServiceImpl grpcThread;
 
     void injectDependencies() {
-        INJECT_DEPENDENCY(loggerThread, grpcThread);
-        INJECT_DEPENDENCY(readThread, loggerThread);
-        INJECT_DEPENDENCY(readThread, grpcThread);
+        grpcThread.loggerThread = &loggerThread;
+        loggerThread.readThread = readThread.get();
+        grpcThread.readThread = readThread.get();
     }
 };
 

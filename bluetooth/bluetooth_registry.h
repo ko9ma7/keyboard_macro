@@ -1,13 +1,13 @@
 #include <vector>
 #include <memory>
 #include <iostream>
-#include <gio/gio.h>
+#include <map>
+#include <systemd/sd-bus.h>
 #include "bluetooth_device.h"
 
 class BluetoothRegistry {
 public:
-    // GDBusConnection 객체를 생성자에서 받습니다.
-    explicit BluetoothRegistry(GDBusConnection* busConnection)
+    explicit BluetoothRegistry(sd_bus* busConnection)
         : bus(busConnection) {
         if (!bus) {
             std::cerr << "Invalid D-Bus connection provided." << std::endl;
@@ -20,9 +20,17 @@ public:
 
     void registerAllDevices();
 
-private:
-    GDBusConnection* bus;
-    std::vector<std::shared_ptr<BluetoothDevice>> devices;
+    void addDevice(const char* devicePath);
 
-    void addDevice(const gchar* devicePath, GVariant* interfaces_and_properties);
+    void removeDevice(const char* devicePath);
+
+    void sendMessageAll(const void* report, size_t size);
+
+private:
+    sd_bus* bus;
+    std::map<std::string, std::shared_ptr<BluetoothDevice>> devices;
+
+    void readDevicePath(const char* devicePath, sd_bus_message* interfaces_and_properties);
+
+    
 };

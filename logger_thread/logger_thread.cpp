@@ -6,7 +6,6 @@
 
 void LoggerThread::loggerThreadFunc() {
     while (true) {
-
         std::unique_lock<std::mutex> lock(readThread->getLogMutex());
 
         readThread->getLogCondition().wait(lock, [this] { 
