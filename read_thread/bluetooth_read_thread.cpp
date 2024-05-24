@@ -4,17 +4,19 @@ void BluetoothReadThread::startComplexRequests(const std::vector<read_thread_ns:
     std::cout<<"반복 횟수 "<<repeatCount<<'\n';
     for (int i = 0; i < repeatCount; ++i) {
         for (const auto& request : requests) {
-            startMacroReplay(request.filename);
-            waitForCompletion();
-            if (stopRequested) {
-                if (hidg_fd >= 0) {
-                    unsigned char stopReport[] = {0, 0, 0, 0, 0, 0, 0, 0};
-                    this->outputWrite(hidg_fd, stopReport, sizeof(stopReport));
-                    std::cout<<"reset fd: "<<hidg_fd<<"\n";
+            for (int j = 0; j < request.repeatCount; ++j) {
+                startMacroReplay(request.filename);
+                waitForCompletion();
+                if (stopRequested) {
+                    if (hidg_fd >= 0) {
+                        unsigned char stopReport[] = {0, 0, 0, 0, 0, 0, 0, 0};
+                        this->outputWrite(hidg_fd, stopReport, sizeof(stopReport));
+                        std::cout<<"reset fd: "<<hidg_fd<<"\n";
+                    }
+                    break; // 종료 플래그가 설정되면 루프를 종료
                 }
-                break; // 종료 플래그가 설정되면 루프를 종료
+                std::this_thread::sleep_for(std::chrono::seconds(request.delayAfter));  // 지정된 시간만큼 지연
             }
-            std::this_thread::sleep_for(std::chrono::seconds(request.delayAfter));  // 지정된 시간만큼 지연
         }
     }
 }

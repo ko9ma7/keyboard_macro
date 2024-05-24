@@ -1,4 +1,6 @@
 #include "bluetooth_device.h"
+#include <cstdint>
+#include <unistd.h>
 
 void BluetoothDevice::connectSockets() {
     control_socket = socket(AF_UNIX, SOCK_SEQPACKET, 0);

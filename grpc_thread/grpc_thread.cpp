@@ -95,7 +95,7 @@ grpc::Status InputServiceImpl::StartComplexReplay(grpc::ServerContext* context, 
 
     // ComplexReplayRequest로부터 ReplayRequest 벡터를 구성합니다.
     for (const auto& task : request->tasks()) {
-        read_thread_ns::ReplayRequest replayRequest = {task.filename(), task.delayafter()};
+        read_thread_ns::ReplayRequest replayRequest = {task.filename(), task.delayafter(), task.repeatcount()};
         requests.push_back(replayRequest);
     }
 

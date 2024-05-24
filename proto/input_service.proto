@@ -75,4 +75,5 @@ message ComplexReplayRequest {
 message ReplayTask {
   string filename = 1; // 녹화 파일 이름
   int32 delayAfter = 2; // 파일 재생 후 지연 시간(초)
+  int32 repeatCount = 3;
 }

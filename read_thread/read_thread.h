@@ -25,6 +25,7 @@ namespace read_thread_ns {
     struct ReplayRequest {
         std::string filename;
         int delayAfter;
+        int repeatCount;
     };
 }
 
@@ -122,20 +123,22 @@ public:
         std::cout<<"반복 횟수 "<<repeatCount<<'\n';
         for (int i = 0; i < repeatCount; ++i) {
             for (const auto& request : requests) {
-                startMacroReplay_otherfile(request.filename);
-                bool stopSign = waitForCompletion_otherfile();
-                if (stopSign) {
-                    int hidg_fd = outputOpen(HIDG_MACRO_PATH, O_RDWR);
+                for (int j = 0; j < request.repeatCount; ++j) { // 추가된 반복 루프
+                    startMacroReplay_otherfile(request.filename);
+                    bool stopSign = waitForCompletion_otherfile();
+                    if (stopSign) {
+                        int hidg_fd = outputOpen(HIDG_MACRO_PATH, O_RDWR);
 
-                    if (hidg_fd >= 0) {
-                        unsigned char stopReport[] = {0, 0, 0, 0, 0, 0, 0, 0};
-                        write(hidg_fd, stopReport, sizeof(stopReport));
-                        outputClose(hidg_fd);
-                        std::cout<<"reset fd: "<<hidg_fd<<"\n";
+                        if (hidg_fd >= 0) {
+                            unsigned char stopReport[] = {0, 0, 0, 0, 0, 0, 0, 0};
+                            write(hidg_fd, stopReport, sizeof(stopReport));
+                            outputClose(hidg_fd);
+                            std::cout << "reset fd: " << hidg_fd << "\n";
+                        }
+                        break; // 종료 플래그가 설정되면 루프를 종료
                     }
-                    break; // 종료 플래그가 설정되면 루프를 종료
+                    std::this_thread::sleep_for(std::chrono::seconds(request.delayAfter));  // 지정된 시간만큼 지연
                 }
-                std::this_thread::sleep_for(std::chrono::seconds(request.delayAfter));  // 지정된 시간만큼 지연
             }
         }
     }
