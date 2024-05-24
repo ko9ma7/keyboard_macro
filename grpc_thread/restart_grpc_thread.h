@@ -10,6 +10,9 @@ class RestartServiceImpl final : public Restart::Service {
 public:
     grpc::Status RestartProcess(grpc::ServerContext* context, const RestartRequest* request,
                                 RestartResponse* response) override;
+    
+    grpc::Status RequestUpdate(grpc::ServerContext* context, const UpdateRequest* request,
+                               UpdateResponse* response) override;
 };
 
 #endif // GRPC_THREAD_H

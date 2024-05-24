@@ -18,3 +18,17 @@ grpc::Status RestartServiceImpl::RestartProcess(grpc::ServerContext* context, co
 
     return grpc::Status::OK;
 }
+
+grpc::Status RestartServiceImpl::RequestUpdate(grpc::ServerContext* context, const UpdateRequest* request,
+                                               UpdateResponse* response) {
+    std::cout << "업데이트 요청\n";
+
+    system("sudo /home/ccxz84/stop.sh");
+
+    // 업데이트 실행
+    system("sudo /home/ccxz84/updater");
+
+    std::cout << "업데이트 완료\n";
+
+    return grpc::Status::OK;
+}
