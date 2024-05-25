@@ -82,39 +82,34 @@ if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
     message(STATUS "Detected ARM 64-bit architecture")
     set(PLATFORM "ARM 64bit")
     set(BLUETOOTH "No Bluetooth")
-    add_executable(KeyboardDriver ${UPDATER_SOURCES})
-    target_compile_options(KeyboardDriver PRIVATE -Wall -O2)
-    target_link_libraries(KeyboardDriver PRIVATE ${LIBUSB_LIBRARY} ${SYSTEMD_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES} ${JSONCPP_LIBRARY} pthread ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
-    install(TARGETS KeyboardDriver DESTINATION ${CMAKE_SOURCE_DIR}/rspi)
 elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
     message(STATUS "Detected ARM 32-bit architecture")
     set(PLATFORM "ARM 32bit")
     set(BLUETOOTH "Bluetooth")
-    add_executable(KeyboardDriver ${UPDATER_SOURCES})
-    target_compile_definitions(KeyboardDriver PRIVATE HAVE_BLUETOOTH)
-    target_compile_options(KeyboardDriver PRIVATE -Wall -O2)
-    target_link_libraries(KeyboardDriver PRIVATE ${LIBUSB_LIBRARY} ${SYSTEMD_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES} ${JSONCPP_LIBRARY} pthread ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
-    install(TARGETS KeyboardDriver DESTINATION ${CMAKE_SOURCE_DIR}/rspi)
 else()
     message(FATAL_ERROR "Unsupported platform")
 endif()
 
 # 기존 실행 파일들 추가
+add_executable(KeyboardDriver ${KEYBOARD_DRIVER_SOURCES})
 add_executable(KeyboardDriverRestarter ${KEYBOARD_RESTARTER_SOURCES})
 add_executable(RunMacro ${KEYBOARD_RUN_MACRO_SOURCES})
 add_executable(KeyboardBluetoothDriver ${KEYBOARD_BLUETOOTH_SOURCES})
 
 # 라이브러리와 링크
+target_link_libraries(KeyboardDriver PRIVATE ${LIBUSB_LIBRARY} ${SYSTEMD_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES} ${JSONCPP_LIBRARY} pthread ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
 target_link_libraries(KeyboardDriverRestarter PRIVATE ${LIBUSB_LIBRARY} ${SYSTEMD_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES} ${JSONCPP_LIBRARY} pthread ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
 target_link_libraries(RunMacro PRIVATE ${LIBUSB_LIBRARY} ${SYSTEMD_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES} ${JSONCPP_LIBRARY} pthread ${_REFLECTION})
 target_link_libraries(KeyboardBluetoothDriver PRIVATE ${LIBUSB_LIBRARY} ${SYSTEMD_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES} ${JSONCPP_LIBRARY} pthread ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
 
 # 컴파일 옵션
+target_compile_options(KeyboardDriver PRIVATE -Wall -O2)
 target_compile_options(KeyboardDriverRestarter PRIVATE -Wall -O2)
 target_compile_options(RunMacro PRIVATE -Wall -O2)
 target_compile_options(KeyboardBluetoothDriver PRIVATE -Wall -O2)
 
 # 설치 경로
+install(TARGETS KeyboardDriver DESTINATION ${CMAKE_SOURCE_DIR}/rspi)
 install(TARGETS KeyboardDriverRestarter DESTINATION ${CMAKE_SOURCE_DIR}/rspi)
 install(TARGETS RunMacro DESTINATION ${CMAKE_SOURCE_DIR}/rspi)
 install(TARGETS KeyboardBluetoothDriver DESTINATION ${CMAKE_SOURCE_DIR}/rspi)
