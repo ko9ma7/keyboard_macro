@@ -1,38 +1,21 @@
-#include <iostream>
-#include <curl/curl.h>
-#include <json/json.h>
-#include <filesystem>
-#include <fstream>
-#include <string>
+#include "updater_thread.h"
 
-namespace fs = std::filesystem;
-
-// 플랫폼 및 Bluetooth 지원 매크로 정의
-#if defined(__aarch64__)
-#define PLATFORM "ARM 64bit"
-#define BIT_SUFFIX "_64bit"
-#elif defined(__arm__)
-#define PLATFORM "ARM 32bit"
-#define BIT_SUFFIX "_32bit"
-#else
-#error "Unsupported platform"
-#endif
-
-// Bluetooth 지원 여부 매크로 정의 (필요에 따라 설정)
-#if defined(HAVE_BLUETOOTH)
-#define BLUETOOTH "Bluetooth"
-#define BLUETOOTH_SUFFIX "_bluetooth"
-#else
-#define BLUETOOTH "No Bluetooth"
-#define BLUETOOTH_SUFFIX "_nonbluetooth"
-#endif
-
-size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
+size_t UpdaterThread::WriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
     return size * nmemb;
 }
 
-std::string getLatestVersionFromGitHub() {
+int UpdaterThread::ProgressCallback(void* ptr, curl_off_t totalDownload, curl_off_t nowDownload,
+                                    curl_off_t totalUpload, curl_off_t nowUpload) {
+    UpdaterThread* updater = static_cast<UpdaterThread*>(ptr);
+    if (totalDownload > 0) {
+        int progress = static_cast<int>((nowDownload * 100) / totalDownload);
+        updater->sendUpdateProgress(progress, "Downloading update...");
+    }
+    return 0;
+}
+
+std::string UpdaterThread::getLatestVersionFromGitHub() {
     CURL *curl;
     CURLcode res;
     std::string readBuffer;
@@ -42,7 +25,7 @@ std::string getLatestVersionFromGitHub() {
     if (curl) {
         curl_easy_setopt(curl, CURLOPT_URL, "https://api.github.com/repos/ccxz84/keyboard_macro/releases/latest");
         curl_easy_setopt(curl, CURLOPT_USERAGENT, "curl/7.68.0");
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, UpdaterThread::WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
         res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
@@ -58,19 +41,19 @@ std::string getLatestVersionFromGitHub() {
     return "";
 }
 
-std::string getCurrentVersion() {
+std::string UpdaterThread::getCurrentVersion() {
     std::ifstream versionFile("version.txt");
     std::string version;
     std::getline(versionFile, version);
     return version;
 }
 
-size_t WriteFileCallback(void *ptr, size_t size, size_t nmemb, FILE *stream) {
+size_t UpdaterThread::WriteFileCallback(void *ptr, size_t size, size_t nmemb, FILE *stream) {
     size_t written = fwrite(ptr, size, nmemb, stream);
     return written;
 }
 
-void downloadUpdateFile(const std::string &url, const std::string &outputPath) {
+void UpdaterThread::downloadUpdateFile(const std::string &url, const std::string &outputPath) {
     CURL *curl;
     FILE *fp;
     CURLcode res;
@@ -85,8 +68,12 @@ void downloadUpdateFile(const std::string &url, const std::string &outputPath) {
         }
 
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFileCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, UpdaterThread::WriteFileCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, UpdaterThread::ProgressCallback);
+        curl_easy_setopt(curl, CURLOPT_XFERINFODATA, this);
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L); // Enable progress meter
+
         curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);  // Fail on HTTP errors
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);  // Follow redirects
 
@@ -108,12 +95,12 @@ void downloadUpdateFile(const std::string &url, const std::string &outputPath) {
     }
 }
 
-bool verifyDownloadedFile(const std::string &filePath, const std::string &expectedHash) {
+bool UpdaterThread::verifyDownloadedFile(const std::string &filePath, const std::string &expectedHash) {
     // 해시 검증 로직을 여기에 추가하세요.
     return true; // 예시로 true 반환
 }
 
-void installUpdate(const std::string &updateFilePath) {
+void UpdaterThread::installUpdate(const std::string &updateFilePath) {
     const std::string targetDirectory = "/home/ccxz84";
     const std::string targetFilePath = targetDirectory + "/KeyboardDriver"; // 변경할 타겟 파일 이름
 
@@ -137,14 +124,14 @@ void installUpdate(const std::string &updateFilePath) {
     }
 }
 
-void performUpdate() {
+void UpdaterThread::performUpdate() {
     std::string currentVersion = getCurrentVersion();
     std::string latestVersion = getLatestVersionFromGitHub();
 
     if (latestVersion != currentVersion) {
         std::string updateFileName = "KeyboardDriver" + std::string(BIT_SUFFIX) + std::string(BLUETOOTH_SUFFIX);
         std::string updateUrl = "https://github.com/ccxz84/keyboard_macro/releases/download/" + latestVersion + "/" + updateFileName;
-        std::cout<<updateUrl<<'\n';
+        std::cout << updateUrl << '\n';
         std::string updateFilePath = "/home/ccxz84/update";
 
         downloadUpdateFile(updateUrl, updateFilePath);
@@ -153,15 +140,25 @@ void performUpdate() {
             installUpdate(updateFilePath);
             std::ofstream versionFile("version.txt");
             versionFile << latestVersion;
+            sendUpdateProgress(100, "Update installed successfully.");
         } else {
+            sendUpdateProgress(0, "Downloaded file verification failed!");
             std::cerr << "Downloaded file verification failed!" << std::endl;
         }
     } else {
+        sendUpdateProgress(100, "No updates available.");
         std::cout << "No updates available." << std::endl;
     }
 }
 
-int main() {
+void UpdaterThread::sendUpdateProgress(int progress, const std::string& status_message) {
+    UpdateResponse response;
+    response.set_progress(progress);
+    response.set_status_message(status_message);
+    writer->Write(response);
+}
+
+void UpdaterThread::runUpdate() {
     std::string currentVersion = getCurrentVersion();
     std::cout << "App Version: " << currentVersion << std::endl;
     std::cout << "Platform: " << PLATFORM << std::endl;
@@ -169,5 +166,5 @@ int main() {
 
     performUpdate();
 
-    return 0;
+    return;
 }

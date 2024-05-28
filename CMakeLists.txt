@@ -16,7 +16,7 @@ include_directories(${CURL_INCLUDE_DIRS})
 
 # jsoncpp 라이브러리 및 헤더 파일 경로 찾기
 find_path(JSONCPP_INCLUDE_DIR json/json.h PATHS /usr/include/jsoncpp /usr/local/include/jsoncpp)
-find_library(JSONCPP_LIBRARY jsoncpp PATHS /usr/lib /usr/local/lib)
+find_library(JSONCPP_LIBRARY_STATIC NAMES jsoncpp PATHS /usr/lib /usr/local/lib)
 include_directories(${JSONCPP_INCLUDE_DIR})
 
 # libusb 헤더 파일과 라이브러리 경로 찾기
@@ -33,12 +33,14 @@ include_directories(${CMAKE_SOURCE_DIR}/include ${LIBUSB_INCLUDE_DIR} ${SYSTEMD_
 set(KEYBOARD_DRIVER_SOURCES main.cpp)
 file(GLOB MORE_SOURCES "${CMAKE_SOURCE_DIR}/read_thread/*.cpp" "${CMAKE_SOURCE_DIR}/logger_thread/*.cpp"
     "${CMAKE_SOURCE_DIR}/utils/*.cpp" "${CMAKE_SOURCE_DIR}/grpc_thread/*.cpp" "${CMAKE_SOURCE_DIR}/controller/*.cpp" "${CMAKE_SOURCE_DIR}/bluetooth/*.cpp")
+file(GLOB UPDATER_SOURCE "${CMAKE_SOURCE_DIR}/updater/*.cpp")
 list(APPEND KEYBOARD_DRIVER_SOURCES ${MORE_SOURCES})
 
 file(GLOB UTILS_SOURCE "${CMAKE_SOURCE_DIR}/utils/*.cpp")
 
 # 새로운 KeyboardDriverRestarter 실행 파일
 set(KEYBOARD_RESTARTER_SOURCES restart.cpp)  # restart.cpp를 포함
+list(APPEND KEYBOARD_RESTARTER_SOURCES ${UPDATER_SOURCE})
 list(APPEND KEYBOARD_RESTARTER_SOURCES ${MORE_SOURCES})
 
 set(KEYBOARD_RUN_MACRO_SOURCES macro.cpp)
@@ -75,7 +77,6 @@ endforeach()
 
 # updater.cpp 파일 추가
 set(UPDATER_SOURCES updater.cpp)
-list(APPEND UPDATER_SOURCES ${UTILS_SOURCE})
 
 # 플랫폼 감지
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
@@ -91,14 +92,14 @@ else()
 endif()
 
 # 기존 실행 파일들 추가
-add_executable(KeyboardDriver ${KEYBOARD_DRIVER_SOURCES})
+add_executable(KeyboardDriver ${KEYBOARD_DRIVER_SOURCES}) 
 add_executable(KeyboardDriverRestarter ${KEYBOARD_RESTARTER_SOURCES})
 add_executable(RunMacro ${KEYBOARD_RUN_MACRO_SOURCES})
 add_executable(KeyboardBluetoothDriver ${KEYBOARD_BLUETOOTH_SOURCES})
 
 # 라이브러리와 링크
 target_link_libraries(KeyboardDriver PRIVATE ${LIBUSB_LIBRARY} ${SYSTEMD_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES} ${JSONCPP_LIBRARY} pthread ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
-target_link_libraries(KeyboardDriverRestarter PRIVATE ${LIBUSB_LIBRARY} ${SYSTEMD_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES} ${JSONCPP_LIBRARY} pthread ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
+target_link_libraries(KeyboardDriverRestarter PRIVATE ${CURL_LIBRARIES} ${JSONCPP_LIBRARY_STATIC} ${LIBUSB_LIBRARY} ${SYSTEMD_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES} ${JSONCPP_LIBRARY} pthread ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
 target_link_libraries(RunMacro PRIVATE ${LIBUSB_LIBRARY} ${SYSTEMD_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES} ${JSONCPP_LIBRARY} pthread ${_REFLECTION})
 target_link_libraries(KeyboardBluetoothDriver PRIVATE ${LIBUSB_LIBRARY} ${SYSTEMD_LIBRARIES} ${Boost_LIBRARIES} ${CURL_LIBRARIES} ${JSONCPP_LIBRARY} pthread ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
 

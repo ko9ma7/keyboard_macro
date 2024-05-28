@@ -12,7 +12,7 @@ public:
                                 RestartResponse* response) override;
     
     grpc::Status RequestUpdate(grpc::ServerContext* context, const UpdateRequest* request,
-                               UpdateResponse* response) override;
+                               grpc::ServerWriter<UpdateResponse>* writer) override;
 };
 
 #endif // GRPC_THREAD_H

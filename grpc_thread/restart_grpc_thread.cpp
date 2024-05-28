@@ -3,6 +3,7 @@
 #include <iostream>
 #include <stdio.h>
 #include "restart_grpc_thread.h"
+#include "../updater/updater_thread.h"
 
 grpc::Status RestartServiceImpl::RestartProcess(grpc::ServerContext* context, const RestartRequest* request,
                                               RestartResponse* response) {
@@ -20,15 +21,11 @@ grpc::Status RestartServiceImpl::RestartProcess(grpc::ServerContext* context, co
 }
 
 grpc::Status RestartServiceImpl::RequestUpdate(grpc::ServerContext* context, const UpdateRequest* request,
-                                               UpdateResponse* response) {
+                                               grpc::ServerWriter<UpdateResponse>* writer) {
     std::cout << "업데이트 요청\n";
 
-    system("sudo /home/ccxz84/stop.sh");
-
-    // 업데이트 실행
-    system("sudo /home/ccxz84/updater");
-
-    std::cout << "업데이트 완료\n";
+    UpdaterThread updater(writer);
+    updater.runUpdate();
 
     return grpc::Status::OK;
 }
