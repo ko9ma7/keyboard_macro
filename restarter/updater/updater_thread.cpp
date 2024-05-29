@@ -9,14 +9,14 @@ size_t UpdaterThread::WriteCallback(void *contents, size_t size, size_t nmemb, v
 
 int UpdaterThread::ProgressCallback(void* ptr, curl_off_t totalDownload, curl_off_t nowDownload,
                                     curl_off_t totalUpload, curl_off_t nowUpload) {
-    
     UpdaterThread* updater = static_cast<UpdaterThread*>(ptr);
     if (totalDownload > 0) {
         int rawProgress = static_cast<int>((nowDownload * 100) / totalDownload);
         int adjustedProgress = 10 + (rawProgress * 80) / 100; // Map 0-100% to 10-90%
-        std::cout << "Download progress: " << adjustedProgress << "%\n";
-        if (adjustedProgress % 10 == 0){
+        if (adjustedProgress % 10 == 0 && updater->prevPrgress != adjustedProgress){
+            std::cout << "Download progress: " << adjustedProgress << "%\n";
             std::lock_guard<std::mutex> lock(updater->writerMutex); // Protect writer access
+            updater->prevPrgress = adjustedProgress;
             updater->progressCallback(adjustedProgress, "Downloading update...");
         }
     }
