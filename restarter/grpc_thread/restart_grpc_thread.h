@@ -4,6 +4,7 @@
 
 #include <grpcpp/grpcpp.h>
 #include "grpc/restart_service.grpc.pb.h"
+#include "../updater/updater_thread.h"
 
 class RestartServiceImpl final : public Restart::Service {
 

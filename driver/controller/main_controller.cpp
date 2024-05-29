@@ -5,7 +5,7 @@
 #include <thread>
 #include <condition_variable>
 #include "main_controller.h"
-#include "../utils/keyboard_util.h"
+#include "../../utils/keyboard_util.h"
 #include "../read_thread/bluetooth_read_thread.h"
 
 int ThreadController::RunThread() {

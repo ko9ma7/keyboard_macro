@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <mutex>
 #include <grpcpp/grpcpp.h>
 #include "grpc/restart_service.grpc.pb.h"
 
@@ -34,10 +35,15 @@ namespace fs = std::filesystem;
 
 class UpdaterThread {
 public:
-    UpdaterThread(grpc::ServerWriter<UpdateResponse>* writer) : writer(writer) {}
+    using ProgressFunction = std::function<void(int, const std::string&)>;
+    UpdaterThread(ProgressFunction progressCallback) : progressCallback(progressCallback) {}
     void runUpdate();
 
 private:
+    std::mutex writerMutex;
+
+    ProgressFunction progressCallback;
+
     static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp);
 
     static int ProgressCallback(void* ptr, curl_off_t totalDownload, curl_off_t nowDownload,
@@ -56,8 +62,6 @@ private:
     void installUpdate(const std::string &updateFilePath);
 
     void performUpdate();
-
-    void sendUpdateProgress(int progress, const std::string& status_message);
 
     grpc::ServerWriter<UpdateResponse>* writer;
 };

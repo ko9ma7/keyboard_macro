@@ -12,10 +12,8 @@
 #include <libusb-1.0/libusb.h>
 #include <mutex>
 #include <condition_variable>
-#include "../utils/keyboard_util.h"
 #include <random>
 #include "read_thread.h"
-#include "../utils/type.h"
 
 void ReadThread::cb_transfer(struct libusb_transfer* transfer) {
     ReadThread* self = static_cast<ReadThread*>(transfer->user_data);
