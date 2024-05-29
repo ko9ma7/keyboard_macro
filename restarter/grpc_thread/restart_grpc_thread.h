@@ -4,6 +4,7 @@
 
 #include <grpcpp/grpcpp.h>
 #include "grpc/restart_service.grpc.pb.h"
+#include "../updater/updater_thread.h"
 
 class RestartServiceImpl final : public Restart::Service {
 
@@ -12,7 +13,7 @@ public:
                                 RestartResponse* response) override;
     
     grpc::Status RequestUpdate(grpc::ServerContext* context, const UpdateRequest* request,
-                               UpdateResponse* response) override;
+                               grpc::ServerWriter<UpdateResponse>* writer) override;
 };
 
 #endif // GRPC_THREAD_H

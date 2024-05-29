@@ -1,6 +1,7 @@
 // grpc_thread.cpp
 #include <cstdlib>
 #include <iostream>
+#include <thread>
 #include <stdio.h>
 #include "restart_grpc_thread.h"
 
@@ -20,15 +21,26 @@ grpc::Status RestartServiceImpl::RestartProcess(grpc::ServerContext* context, co
 }
 
 grpc::Status RestartServiceImpl::RequestUpdate(grpc::ServerContext* context, const UpdateRequest* request,
-                                               UpdateResponse* response) {
+                                               grpc::ServerWriter<UpdateResponse>* writer) {
     std::cout << "업데이트 요청\n";
 
     system("sudo /home/ccxz84/stop.sh");
 
-    // 업데이트 실행
-    system("sudo /home/ccxz84/updater");
+    auto progressCallback = [writer](int progress, const std::string& status_message) {
+        UpdateResponse response;
+        response.set_progress(progress);
+        response.set_status_message(status_message);
 
-    std::cout << "업데이트 완료\n";
+        // gRPC 스트림이 스레드 안전하지 않기 때문에 동기화 필요
+        static std::mutex writerMutex;
+        std::lock_guard<std::mutex> lock(writerMutex);
+
+        writer->Write(response); // UpdateResponse 객체의 참조를 전달
+    };
+
+    UpdaterThread updater(progressCallback);
+
+    updater.runUpdate();
 
     return grpc::Status::OK;
 }

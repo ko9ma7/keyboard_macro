@@ -2,7 +2,7 @@
 #include "grpc_thread.h"
 #include <iostream>
 #include <stdio.h>
-#include "../utils/type.h"
+#include "../../utils/type.h"
 
 grpc::Status InputServiceImpl::StartRecording(grpc::ServerContext* context, const StartRequest* request,
                                               StatusResponse* response) {

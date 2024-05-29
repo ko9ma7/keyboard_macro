@@ -2,7 +2,7 @@
 #include "logger_thread.h"
 #include <fstream>
 #include <iostream>
-#include "../utils/type.h"
+#include "../../utils/type.h"
 
 void LoggerThread::loggerThreadFunc() {
     while (true) {

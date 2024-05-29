@@ -10,7 +10,7 @@
 #include "../read_thread/read_thread.h"
 #include <fstream>
 #include <filesystem>
-#include "../utils/type.h"
+#include "../../utils/type.h"
 
 class LoggerThread {
 public:

@@ -18,8 +18,8 @@
 #include <time.h>
 #include <unistd.h>  // fork, exec, pid_t
 #include <signal.h>  // kill
-#include "../utils/type.h"
-#include "../utils/keyboard_util.h"
+#include "../../utils/type.h"
+#include "../../utils/keyboard_util.h"
 
 namespace read_thread_ns {
     struct ReplayRequest {

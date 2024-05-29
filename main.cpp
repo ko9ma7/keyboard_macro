@@ -1,4 +1,4 @@
-#include "controller/main_controller.h"
+#include "driver/controller/main_controller.h"
 
 int main() {
     ThreadController controller;
