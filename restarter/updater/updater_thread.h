@@ -36,10 +36,14 @@ namespace fs = std::filesystem;
 class UpdaterThread {
 public:
     using ProgressFunction = std::function<void(int, const std::string&)>;
-    UpdaterThread(ProgressFunction progressCallback) : progressCallback(progressCallback) {}
+    UpdaterThread(ProgressFunction progressCallback) : progressCallback(progressCallback) {
+        prevPrgress = 0;
+    }
     void runUpdate();
 
 private:
+    int prevPrgress;
+
     std::mutex writerMutex;
 
     ProgressFunction progressCallback;
