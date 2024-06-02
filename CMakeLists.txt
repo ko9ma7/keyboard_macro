@@ -74,6 +74,12 @@ foreach(PROTO_FILE ${PROTO_FILES})
   list(APPEND KEYBOARD_BLUETOOTH_SOURCES "${GENERATED_PROTOBUF_PATH}/${PROTO_NAME}.grpc.pb.cc" "${GENERATED_PROTOBUF_PATH}/${PROTO_NAME}.pb.cc")
 endforeach()
 
+# 플랫폼 감지
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+    message(STATUS "Enabling Bluetooth support")
+    add_definitions(-DHAVE_BLUETOOTH)
+endif()
+
 # 기존 실행 파일들 추가
 add_executable(KeyboardDriver ${KEYBOARD_DRIVER_SOURCES}) 
 add_executable(KeyboardDriverRestarter ${KEYBOARD_RESTARTER_SOURCES})
