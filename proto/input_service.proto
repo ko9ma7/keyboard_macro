@@ -12,6 +12,8 @@ service Input {
   rpc SaveMacro(SaveMacroRequest) returns (SaveMacroResponse);
   rpc DeleteMacros(DeleteMacrosRequest) returns (StatusResponse);
   rpc StartComplexReplay(ComplexReplayRequest) returns (StatusResponse);
+  rpc ImportProfile(ImportProfileRequest) returns (StatusResponse);
+  rpc ExportProfile(ExportProfileRequest) returns (ExportProfileResponse);
 }
 
 message KeyEvent {
@@ -76,4 +78,19 @@ message ReplayTask {
   string filename = 1; // 녹화 파일 이름
   int32 delayAfter = 2; // 파일 재생 후 지연 시간(초)
   int32 repeatCount = 3;
+}
+
+// Import Profile
+message ImportProfileRequest {
+  string filename = 1;
+  bytes savfile = 2;
+}
+
+// Export Profile
+message ExportProfileRequest {
+  string filename = 1;
+}
+
+message ExportProfileResponse {
+  bytes savfile = 1;
 }

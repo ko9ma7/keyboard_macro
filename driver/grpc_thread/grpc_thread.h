@@ -34,6 +34,9 @@ public:
         StatusResponse* response) override;
     grpc::Status StartComplexReplay(grpc::ServerContext* context, const ComplexReplayRequest* request,
         StatusResponse* response) override;
+
+    grpc::Status ImportProfile(grpc::ServerContext* context, const ImportProfileRequest* request, StatusResponse* response) override;
+    grpc::Status ExportProfile(grpc::ServerContext* context, const ExportProfileRequest* request, ExportProfileResponse* response) override;
 };
 
 #endif // GRPC_THREAD_H

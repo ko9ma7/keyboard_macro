@@ -127,3 +127,29 @@ grpc::Status InputServiceImpl::DeleteMacros(grpc::ServerContext* context, const 
     response->set_message("파일 삭제 완료");
     return grpc::Status::OK;
 }
+
+grpc::Status InputServiceImpl::ImportProfile(grpc::ServerContext* context, const ImportProfileRequest* request, StatusResponse* response) {
+    std::vector<unsigned char> data(request->savfile().begin(), request->savfile().end());
+
+    bool success = readThread->importProfile(request->filename(), data);
+
+    if (success) {
+        response->set_message("프로필 가져오기 성공");
+    } else {
+        response->set_message("프로필 가져오기 실패");
+    }
+
+    return grpc::Status::OK;
+}
+
+grpc::Status InputServiceImpl::ExportProfile(grpc::ServerContext* context, const ExportProfileRequest* request, ExportProfileResponse* response) {
+    std::vector<unsigned char> data = readThread->exportProfile(request->filename());
+
+    if (!data.empty()) {
+        response->set_savfile(data.data(), data.size());
+    } else {
+        return grpc::Status(grpc::StatusCode::NOT_FOUND, "프로필 파일을 찾을 수 없음");
+    }
+
+    return grpc::Status::OK;
+}

@@ -272,3 +272,51 @@ std::vector<KeyMacro::KeyEvent> ReadThread::readMacroFile(const std::string& fil
     logFile.close();
     return events;
 }
+
+bool ReadThread::importProfile(const std::string& filename, const std::vector<unsigned char>& data) {
+    std::string fullPath = "save/" + filename;  // 전체 파일 경로 생성
+    std::ofstream outFile(fullPath, std::ios::binary);  // 바이너리 모드로 파일 열기
+
+    if (!outFile.is_open()) {
+        std::cerr << "Error opening file for import: " << filename << std::endl;
+        return false;
+    }
+
+    outFile.write(reinterpret_cast<const char*>(data.data()), data.size());
+    outFile.close();
+
+    if (!outFile) {
+        std::cerr << "Error writing to file: " << filename << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+std::vector<unsigned char> ReadThread::exportProfile(const std::string& filename) {
+    std::string fullPath = "save/" + filename;  // 전체 파일 경로 생성
+    std::ifstream inFile(fullPath, std::ios::binary);  // 바이너리 모드로 파일 열기
+    std::vector<unsigned char> data;
+
+    if (!inFile.is_open()) {
+        std::cerr << "Error opening file for export: " << filename << std::endl;
+        return data;
+    }
+
+    inFile.seekg(0, std::ios::end);
+    std::streamsize size = inFile.tellg();
+    inFile.seekg(0, std::ios::beg);
+
+    if (size > 0) {
+        data.resize(size);
+        inFile.read(reinterpret_cast<char*>(data.data()), size);
+    }
+    
+    inFile.close();
+
+    if (!inFile) {
+        std::cerr << "Error reading from file: " << filename << std::endl;
+    }
+
+    return data;
+}
