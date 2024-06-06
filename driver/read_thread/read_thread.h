@@ -157,6 +157,9 @@ public:
 
     friend class BluetoothReadThread;
 
+    bool importProfile(const std::string& filename, const std::vector<unsigned char>& data);
+    std::vector<unsigned char> exportProfile(const std::string& filename);
+
 private:
     std::queue<std::pair<std::chrono::nanoseconds, std::vector<unsigned char>>> logQueue;
     std::mutex logMutex;
